@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "verifier": "npm run lint && npm run typecheck",
-    "db:push": "node scripts/db-push.mjs"
+    "db:push": "node scripts/db-push.mjs",
+    "secrets:github": "node scripts/secrets-github.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
