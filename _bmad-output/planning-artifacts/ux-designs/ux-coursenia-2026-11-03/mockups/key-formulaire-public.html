@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — Formulaire public</title>
+<style>
+/* Maquette statique : EXPERIENCE.md §9.1, §9.2, §5 (états), Flow 1 ; DESIGN.md Colors, Typography, Components.
+   Les documents font foi en cas de différence. */
+:root{--primary:#1E3A8A;--bg:#F8FAFC;--surface:#fff;--fg:#0F172A;--muted:#64748B;--border:#E2E8F0;--ring:#2563EB;--danger:#B91C1C;--ok-bg:#DCFCE7;--ok-fg:#166534}
+*{box-sizing:border-box}
+body{margin:0;background:#E5E7EB;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--fg);padding:32px 16px}
+h1.page{font-size:18px;text-align:center;margin:0 0 24px;color:#334155;font-weight:600}
+.row{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.cap{font-size:13px;color:#475569;text-align:center;margin:10px 0 0;max-width:375px}
+.phone{width:375px;border:10px solid #111827;border-radius:36px;background:var(--bg);overflow:hidden}
+.notch{height:22px;background:#111827;width:140px;margin:0 auto;border-radius:0 0 14px 14px}
+.screen{padding:16px 16px 28px;min-height:760px}
+.logo{font-weight:600;font-size:18px;color:var(--primary);margin:8px 0 20px}
+h2{font-size:24px;font-weight:600;margin:0 0 6px;line-height:1.3}
+.sub{font-size:14px;color:var(--muted);margin:0 0 20px}
+fieldset{border:0;padding:0;margin:0 0 18px}
+legend{font-size:15px;font-weight:600;margin-bottom:10px}
+label{display:block;font-size:14px;font-weight:500;margin:0 0 6px}
+.opt{color:var(--muted);font-weight:400}
+.field{margin-bottom:14px}
+.input{width:100%;border:1px solid var(--border);background:#fff;border-radius:6px;padding:10px 12px;font-size:15px;color:var(--fg);min-height:44px}
+.input.ph{color:#94A3B8}
+.select{display:flex;justify-content:space-between}
+textarea.input{min-height:110px;font-family:inherit;resize:none}
+.count{font-size:12px;color:var(--muted);text-align:right;margin-top:4px}
+.notice{font-size:13px;color:var(--muted);background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:4px 0 14px;line-height:1.45}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-bottom:6px}
+.box{width:20px;height:20px;border:1.5px solid #94A3B8;border-radius:4px;flex:none;margin-top:1px;background:#fff}
+.box.err{border-color:var(--danger)}
+.error{color:var(--danger);font-size:13px;margin:4px 0 14px 30px}
+.btn{display:block;width:100%;text-align:center;border-radius:6px;padding:12px;font-size:15px;font-weight:600;min-height:44px;border:0}
+.btn-primary{background:var(--primary);color:#fff;margin-top:10px}
+.btn-secondary{background:#fff;color:var(--primary);border:1px solid var(--border)}
+.foot{text-align:center;font-size:13px;margin-top:22px}
+.foot a{color:var(--muted)}
+.okicon{width:56px;height:56px;border-radius:50%;background:var(--ok-bg);color:var(--ok-fg);font-size:30px;display:flex;align-items:center;justify-content:center;margin:40px auto 18px}
+.center{text-align:center}
+.refbox{background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px;margin:20px 0}
+.reflabel{font-size:13px;color:var(--muted)}
+.ref{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:600;letter-spacing:.5px;margin:6px 0 10px;color:var(--primary)}
+.copy{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:14px;font-weight:500;background:#fff}
+.small{font-size:14px;color:#334155;line-height:1.5}
+.contact{font-size:13px;color:var(--muted);margin:18px 0 24px;line-height:1.5}
+</style>
+</head>
+<body>
+<h1 class="page">Maquette 1 — Dépôt d'une demande (espace public, téléphone)</h1>
+<div class="row">
+
+  <div>
+    <div class="phone"><div class="notch"></div><div class="screen">
+      <div class="logo">Nova Services</div>
+      <h2>Déposer une demande</h2>
+      <p class="sub">Notre équipe vous répond au plus vite. Les champs sans mention sont obligatoires.</p>
+
+      <fieldset>
+        <legend>Vos coordonnées</legend>
+        <div class="field"><label>Nom et prénom</label><div class="input">Sophie Garnier</div></div>
+        <div class="field"><label>Email</label><div class="input">sophie.garnier@atelier-garnier.example</div></div>
+        <div class="field"><label>Téléphone <span class="opt">(facultatif)</span></label><div class="input ph">06 12 34 56 78</div></div>
+        <div class="field"><label>Société <span class="opt">(facultatif)</span></label><div class="input">Atelier Garnier Architectes</div></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Votre demande</legend>
+        <div class="field"><label>Catégorie</label><div class="input select"><span>Problème technique</span><span>▾</span></div></div>
+        <div class="field"><label>Objet</label><div class="input">Impression impossible depuis la mise à jour</div></div>
+        <div class="field"><label>Description</label>
+          <div class="input" style="min-height:110px">Depuis la mise à jour de lundi, aucun des 4 postes du cabinet n'arrive à imprimer sur la Canon du 1er étage. Le message « imprimante hors ligne » s'affiche.</div>
+          <div class="count">172 / 5 000</div></div>
+      </fieldset>
+
+      <div class="notice">Vos informations servent uniquement à traiter votre demande. Elles sont conservées 2 ans après son traitement, puis supprimées. Pour les faire effacer, écrivez à contact@nova-services.example.</div>
+      <div class="check"><span class="box err"></span><span>J'accepte que mes données soient utilisées pour traiter ma demande.</span></div>
+      <div class="error">Cochez cette case pour envoyer votre demande.</div>
+
+      <div class="btn btn-primary">Envoyer ma demande</div>
+      <div class="foot"><a>Espace équipe</a></div>
+    </div></div>
+    <p class="cap">État « erreur » : la case de consentement a été oubliée (Flow 1, étape 3). Le message apparaît sous la case ; rien n'est effacé.</p>
+  </div>
+
+  <div>
+    <div class="phone"><div class="notch"></div><div class="screen center">
+      <div class="logo" style="text-align:left">Nova Services</div>
+      <div class="okicon">✓</div>
+      <h2>Votre demande a bien été enregistrée.</h2>
+      <div class="refbox">
+        <div class="reflabel">Votre référence</div>
+        <div class="ref">NOVA-2026-0042</div>
+        <span class="copy">Copier</span>
+      </div>
+      <p class="small">Conservez-la pour tout échange avec notre équipe.<br>Un email de confirmation vous a été envoyé.</p>
+      <p class="contact">Une question ? Contactez Nova Services<br>contact@nova-services.example</p>
+      <div class="btn btn-secondary">Déposer une autre demande</div>
+    </div></div>
+    <p class="cap">État « complet » : écran de confirmation (Flow 1, étape 5). Aucune coordonnée n'est affichée.</p>
+  </div>
+
+</div>
+</body>
+</html>

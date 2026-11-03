@@ -1,0 +1,130 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Pas de mode sombre : la classe .dark n'est jamais posée. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-primary-hover: var(--primary-hover);
+  --color-surface: var(--surface);
+  --color-status-nouvelle-bg: var(--status-nouvelle-bg);
+  --color-status-nouvelle-fg: var(--status-nouvelle-fg);
+  --color-status-encours-bg: var(--status-encours-bg);
+  --color-status-encours-fg: var(--status-encours-fg);
+  --color-status-traitee-bg: var(--status-traitee-bg);
+  --color-status-traitee-fg: var(--status-traitee-fg);
+  --color-priority-haute-bg: var(--priority-haute-bg);
+  --color-priority-haute-fg: var(--priority-haute-fg);
+  --color-priority-normale-bg: var(--priority-normale-bg);
+  --color-priority-normale-fg: var(--priority-normale-fg);
+  --color-priority-basse-bg: var(--priority-basse-bg);
+  --color-priority-basse-fg: var(--priority-basse-fg);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Rayons de DESIGN.md : 4 px (sm), 6 px (md, boutons et champs), 8 px (lg, cartes) */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Couche Nova (DESIGN.md) par-dessus les valeurs shadcn. Pas de mode sombre. */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #1e3a8a;
+  --primary-foreground: #ffffff;
+  --primary-hover: #1e40af;
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #b91c1c;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #2563eb;
+  --status-nouvelle-bg: #dbeafe;
+  --status-nouvelle-fg: #1e40af;
+  --status-encours-bg: #ffedd5;
+  --status-encours-fg: #9a3412;
+  --status-traitee-bg: #dcfce7;
+  --status-traitee-fg: #166534;
+  --priority-haute-bg: #fee2e2;
+  --priority-haute-fg: #b91c1c;
+  --priority-normale-bg: #f1f5f9;
+  --priority-normale-fg: #334155;
+  --priority-basse-bg: #f8fafc;
+  --priority-basse-fg: #64748b;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 8px;
+  --sidebar: #1e3a8a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1e3a8a;
+  --sidebar-accent: rgb(255 255 255 / 15%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 15%);
+  --sidebar-ring: #2563eb;
+}
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  html {
+    @apply font-sans;
+  }
+}

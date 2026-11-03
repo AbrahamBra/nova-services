@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — Liste des demandes</title>
+<style>
+/* Maquette statique : EXPERIENCE.md §2.2 (menu), §4 (tableau, filtres, badges, compteur), §9.4, Flow 2 ; DESIGN.md Colors, Components.
+   Les documents font foi en cas de différence. */
+:root{--primary:#1E3A8A;--bg:#F8FAFC;--surface:#fff;--fg:#0F172A;--muted:#64748B;--border:#E2E8F0}
+*{box-sizing:border-box}
+body{margin:0;background:#E5E7EB;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--fg);padding:24px 16px}
+h1.page{font-size:18px;text-align:center;margin:0 0 16px;color:#334155;font-weight:600}
+.cap{font-size:13px;color:#475569;text-align:center;margin:10px auto 0;max-width:900px}
+.browser{max-width:1360px;min-width:1280px;margin:0 auto;border-radius:10px;overflow:hidden;border:1px solid #CBD5E1;background:var(--bg)}
+.bar{background:#F1F5F9;border-bottom:1px solid #CBD5E1;padding:8px 12px;display:flex;gap:8px;align-items:center}
+.dot{width:11px;height:11px;border-radius:50%;background:#CBD5E1}
+.url{flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:4px 10px;font-size:12px;color:#64748B;margin-left:8px}
+.app{display:flex;min-height:760px}
+.side{width:240px;background:var(--primary);color:#fff;padding:20px 12px;display:flex;flex-direction:column;flex:none}
+.brand{font-weight:600;font-size:18px;padding:0 10px 22px}
+.nav a{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:6px;font-size:14px;color:#fff;text-decoration:none;margin-bottom:2px}
+.nav a.on{background:rgba(255,255,255,.15);font-weight:600}
+.pill{background:#fff;color:var(--primary);border-radius:9999px;font-size:12px;font-weight:700;padding:1px 8px}
+.group{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.7;padding:18px 10px 6px}
+.me{margin-top:auto;border-top:1px solid rgba(255,255,255,.2);padding:14px 10px 0;font-size:13px}
+.me b{display:block;font-size:14px}
+.me span{opacity:.75}
+.me a{display:block;margin-top:8px;color:#fff;opacity:.85}
+.main{flex:1;padding:28px 32px;min-width:0}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+h2{font-size:24px;font-weight:600;margin:0}
+h2 small{font-size:15px;color:var(--muted);font-weight:400;margin-left:8px}
+.btn{border-radius:6px;padding:9px 16px;font-size:14px;font-weight:600;border:0}
+.btn-primary{background:var(--primary);color:#fff}
+.tools{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.search{flex:1 1 320px;border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:14px;color:#94A3B8}
+.flt{border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:14px;background:#fff;white-space:nowrap}
+.flt.on{border-color:var(--primary);background:#EFF6FF;color:var(--primary);font-weight:500}
+.clear{font-size:14px;color:var(--primary);text-decoration:underline}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:14px}
+th{text-align:left;font-size:13px;color:var(--muted);font-weight:500;padding:10px 12px;border-bottom:1px solid var(--border);background:#F8FAFC;white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid #F1F5F9;vertical-align:top}
+tr:hover td{background:#F8FAFC}
+.ref{font-family:ui-monospace,Consolas,monospace;font-weight:500;color:var(--primary);white-space:nowrap}
+.date{white-space:nowrap;color:#334155}
+.who b{font-weight:500;display:block}
+.who span{color:var(--muted);font-size:13px}
+.st{display:inline-block;border-radius:9999px;padding:2px 10px;font-size:13px;font-weight:500;white-space:nowrap}
+.st-n{background:#DBEAFE;color:#1E40AF}
+.st-c{background:#FFEDD5;color:#9A3412}
+.st-t{background:#DCFCE7;color:#166534}
+.pr{display:inline-block;border-radius:4px;padding:2px 8px;font-size:13px;font-weight:500}
+.pr-h{background:#FEE2E2;color:#B91C1C}
+.pr-n{background:#F1F5F9;color:#334155}
+.pr-b{background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0}
+.none{color:var(--muted)}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:14px;color:var(--muted)}
+.pager .b{border:1px solid var(--border);background:#fff;border-radius:6px;padding:6px 12px;color:var(--fg);margin-left:6px}
+.version{font-size:13px;color:var(--muted);margin-top:28px}
+</style>
+</head>
+<body>
+<h1 class="page">Maquette 2 — Liste des demandes (espace équipe, ordinateur)</h1>
+<div class="browser">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">nova-demandes.example/equipe/demandes?statut=non-traitees</span></div>
+  <div class="app">
+    <nav class="side">
+      <div class="brand">Nova Services</div>
+      <div class="nav">
+        <a>Tableau de bord</a>
+        <a class="on">Demandes <span class="pill">3</span></a>
+        <a>Saisir une demande</a>
+        <div class="group">Administration</div>
+        <a>Comptes</a><a>Catégories</a><a>Paramètres</a><a>Données personnelles</a><a>Journal</a>
+      </div>
+      <div class="me"><b>Karim Benali</b><span>Administrateur</span><a>Se déconnecter</a></div>
+    </nav>
+
+    <main class="main">
+      <div class="head"><h2>Demandes <small>14 résultats</small></h2><span class="btn btn-primary">Saisir une demande</span></div>
+
+      <div class="tools">
+        <span class="search">Rechercher une référence, un nom, une société, un email, un objet…</span>
+        <span class="flt on">Statut : Non traitées ▾</span>
+        <span class="flt">Priorité : Toutes ▾</span>
+        <span class="flt">Catégorie : Toutes ▾</span>
+        <span class="flt">Canal : Tous ▾</span>
+        <span class="flt">Responsable : Tous ▾</span>
+        <span class="clear">Effacer les filtres</span>
+      </div>
+
+      <table>
+        <thead><tr><th>Référence</th><th>Date</th><th>Demandeur</th><th>Objet</th><th>Catégorie</th><th>Canal</th><th>Statut</th><th>Priorité</th><th>Responsable</th></tr></thead>
+        <tbody>
+          <tr><td class="ref">NOVA-2026-0043</td><td class="date">03/11/2026 09:31</td><td class="who"><b>Paul Lambert</b><span>Lambert Conseil</span></td><td>Rendez-vous pour un audit du réseau</td><td>Demande de rendez-vous</td><td>Téléphone</td><td><span class="st st-n">Nouvelle</span></td><td><span class="pr pr-n">Normale</span></td><td class="none">—</td></tr>
+          <tr><td class="ref">NOVA-2026-0042</td><td class="date">03/11/2026 08:47</td><td class="who"><b>Sophie Garnier</b><span>Atelier Garnier Architectes</span></td><td>Impression impossible depuis la mise à jour</td><td>Problème technique</td><td>Formulaire</td><td><span class="st st-c">En cours</span></td><td><span class="pr pr-h">Haute</span></td><td>Karim Benali</td></tr>
+          <tr><td class="ref">NOVA-2026-0041</td><td class="date">02/11/2026 17:12</td><td class="who"><b>Inès Haddad</b><span>Boulangerie Haddad</span></td><td>Question sur la facture d'octobre</td><td>Question administrative</td><td>Email</td><td><span class="st st-n">Nouvelle</span></td><td><span class="pr pr-n">Normale</span></td><td class="none">—</td></tr>
+          <tr><td class="ref">NOVA-2026-0040</td><td class="date">02/11/2026 14:05</td><td class="who"><b>Marc Petit</b><span class="none">—</span></td><td>Tarifs pour un site vitrine</td><td>Demande d'information</td><td>Formulaire</td><td><span class="st st-n">Nouvelle</span></td><td><span class="pr pr-b">Basse</span></td><td class="none">—</td></tr>
+          <tr><td class="ref">NOVA-2026-0038</td><td class="date">31/10/2026 10:22</td><td class="who"><b>Julie Moreau</b><span>Cabinet Moreau Avocats</span></td><td>Messagerie inaccessible sur mobile</td><td>Problème technique</td><td>Formulaire</td><td><span class="st st-c">En cours</span></td><td><span class="pr pr-h">Haute</span></td><td>Nadia Morel</td></tr>
+          <tr><td class="ref">NOVA-2026-0036</td><td class="date">30/10/2026 16:48</td><td class="who"><b>Thomas Roche</b><span>Roche Transports</span></td><td>Installation de 3 postes neufs</td><td>Autre</td><td>Téléphone</td><td><span class="st st-c">En cours</span></td><td><span class="pr pr-n">Normale</span></td><td>Léo Martin</td></tr>
+        </tbody>
+      </table>
+      <div class="pager"><span>1–6 sur 14</span><span><span class="b">Précédent</span><span class="b">Suivant</span></span></div>
+      <div class="version">Version v1.0.0</div>
+    </main>
+  </div>
+</div>
+<p class="cap">État « complet » avec le filtre « Non traitées » actif. Toute la ligne ouvre le détail. Le compteur « 3 » du menu = demandes Nouvelle sans responsable. Sur téléphone, le menu se replie et chaque ligne devient une carte (EXPERIENCE.md §8).</p>
+</body>
+</html>
