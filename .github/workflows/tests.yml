@@ -20,9 +20,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Analyse de tout l'historique avec le programme gitleaks lui-même :
+      # l'action officielle échoue sur le tout premier envoi d'un dépôt
+      # (elle cherche le parent du premier commit, qui n'existe pas).
+      - name: Installer gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
+            | tar xz -C /usr/local/bin gitleaks
+      - name: Chercher des secrets dans tout l'historique
+        run: gitleaks git --redact --verbose --exit-code 1 .
 
   tests:
     name: Lint, typage, Vitest, Playwright
