@@ -399,9 +399,13 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
        order by 1`,
     );
     expect(rows.map((ligne) => ligne.fonction)).toEqual([
+      // Story 1.4 : création des membres (scripts, puis invitations).
+      "creer_membre",
       "deposer_demande",
       "infos_publiques",
       "lire_confirmation",
+      // Story 1.4 : garde-fou du script premier-admin.
+      "nombre_administrateurs_actifs",
     ]);
   });
 

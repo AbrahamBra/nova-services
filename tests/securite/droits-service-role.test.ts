@@ -3,9 +3,9 @@ import { Client } from "pg";
 
 // La clé secrète (`service_role`) contourne RLS : elle ne doit avoir aucun
 // droit direct sur les tables métier, qui ne changent que par les fonctions
-// SQL en SECURITY DEFINER (AD-4, AD-5, AD-6 ; migration 20261103000004).
+// SQL en SECURITY DEFINER (AD-4, AD-5, AD-6 ; migrations 20261103000004 et 0005).
 
-const TABLES = ["demandes", "historique", "compteurs_reference", "categories", "parametres"];
+const TABLES = ["demandes", "historique", "compteurs_reference", "categories", "parametres", "membres"];
 const DROITS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
 
 let client: Client;

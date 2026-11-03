@@ -12,7 +12,9 @@
     "test:e2e": "playwright test",
     "verifier": "npm run lint && npm run typecheck",
     "db:push": "node scripts/db-push.mjs",
-    "secrets:github": "node scripts/secrets-github.mjs"
+    "secrets:github": "node scripts/secrets-github.mjs",
+    "admin:creer": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/premier-admin.ts",
+    "comptes:test": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/comptes-de-test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -48,6 +50,6 @@
     "vitest": "~5.1.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   }
 }

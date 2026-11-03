@@ -11,9 +11,22 @@ export const MESSAGES_ERREUR = {
   DONNEES_INVALIDES: "Certaines informations ne sont pas valides. Vérifiez le formulaire.",
   CATEGORIE_INVALIDE: "Choisissez une catégorie dans la liste.",
   CONSENTEMENT_REQUIS: "Cochez cette case pour envoyer votre demande.",
+  // Story 1.4 — connexion (action `connexion`, propre à l'application) : même
+  // message pour un mauvais mot de passe, un email inconnu et un compte
+  // invité ou désactivé. Il ne révèle jamais si l'email existe.
+  CONNEXION_REFUSEE: "Email ou mot de passe incorrect.",
+  // Story 1.4 — création d'un membre (creer_membre).
+  MEMBRE_EXISTANT: "Ce compte est déjà membre de l'équipe.",
+  EMAIL_DEJA_UTILISE: "Cette adresse email est déjà utilisée par un autre membre.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
+
+/** Codes propres à l'application, jamais levés par une fonction SQL. */
+export const CODES_APPLICATION: readonly CodeErreur[] = [
+  "ERREUR_INATTENDUE",
+  "CONNEXION_REFUSEE",
+];
 
 export const CODES_ERREUR = Object.keys(MESSAGES_ERREUR) as CodeErreur[];
 

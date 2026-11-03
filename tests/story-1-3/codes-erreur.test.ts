@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CODES_ERREUR, MESSAGES_ERREUR } from "@/lib/erreurs";
+import { CODES_APPLICATION, CODES_ERREUR, MESSAGES_ERREUR } from "@/lib/erreurs";
 
 // Story 1.3 — concordance des codes d'erreur prévus (AD-20) : chaque code levé
 // par une migration (`raise exception using errcode = 'P0001', message = 'X'`)
 // figure dans lib/erreurs.ts, et chaque code de lib/erreurs.ts (sauf
-// ERREUR_INATTENDUE, propre à l'application) est levé par une migration.
+// les codes propres à l'application, CODES_APPLICATION) est levé par une migration.
 
 const DOSSIER = join(process.cwd(), "supabase", "migrations");
 
@@ -36,7 +36,7 @@ describe("codes d'erreur — SQL et lib/erreurs.ts", () => {
 
   it("chaque code de lib/erreurs.ts est levé par une migration", () => {
     const sql = codesDesMigrations();
-    for (const code of CODES_ERREUR.filter((c) => c !== "ERREUR_INATTENDUE")) {
+    for (const code of CODES_ERREUR.filter((c) => !CODES_APPLICATION.includes(c))) {
       expect(sql, `code ${code} jamais levé en SQL`).toContain(code);
     }
   });

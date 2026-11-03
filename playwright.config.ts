@@ -7,6 +7,9 @@ export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.spec.ts",
   fullyParallel: true,
+  // En local : 3 navigateurs à la fois au plus. Davantage sature le serveur
+  // de développement et la base partagée (attentes dépassées). CI inchangée.
+  workers: enCI ? undefined : 3,
   forbidOnly: enCI,
   retries: enCI ? 1 : 0,
   reporter: enCI ? [["list"], ["html", { open: "never" }]] : "list",

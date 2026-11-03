@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FormulaireDepot } from "@/components/formulaire-depot";
 import { BoutonReessayer } from "@/components/nova/reessayer";
 import { formaterDuree } from "@/lib/format";
@@ -17,6 +18,7 @@ export default async function Accueil() {
   const infos = await lireInfosPubliques();
 
   return (
+    <>
     <main className="mx-auto w-full max-w-[560px] flex-1 px-4 py-6 md:px-8 md:py-10">
       <header>
         <p className="text-lg font-semibold leading-[1.4] text-primary">
@@ -49,5 +51,18 @@ export default async function Accueil() {
         </div>
       )}
     </main>
+
+    {/* Pied de page : accès discret à l'espace équipe (EXPERIENCE.md §9.1). */}
+    <footer className="mx-auto w-full max-w-[560px] px-4 pb-6 md:px-8">
+      <div className="border-t border-border pt-4 text-center">
+        <Link
+          href="/connexion"
+          className="inline-flex min-h-11 items-center rounded-sm px-2 text-[13px] text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          Espace équipe
+        </Link>
+      </div>
+    </footer>
+    </>
   );
 }

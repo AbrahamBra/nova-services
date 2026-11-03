@@ -21,3 +21,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-envoyer-ma-demande.md`
   summary: Tester la branche d'erreur de la page de confirmation (`lireConfirmation` en échec → bandeau « Réessayer »).
   evidence: Aucun test ne couvre `lib/confirmation.ts` en échec.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-me-connecter-espace-equipe.md`
+  summary: Tester les chemins d'échec de la connexion avec un client simulé (erreur Auth, `mon_profil` en échec, `signOut` en échec).
+  evidence: Les tests actuels utilisent la vraie base ; la story 1.9 modifie la même action.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-me-connecter-espace-equipe.md`
+  summary: Menu mobile : bloquer le défilement et rendre la page inerte quand le panneau est ouvert ; rubrique active par préfixe.
+  evidence: Accessibilité du panneau incomplète ; sous-pages de l'administration à venir (epic 4).

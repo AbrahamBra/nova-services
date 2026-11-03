@@ -7,7 +7,13 @@ import { Client } from "pg";
 
 // Droits explicitement accordés par les stories, sous la forme
 // « role:type:schema.objet:droit ». Vide à la story 1.1.
-const DROITS_ATTENDUS: string[] = [];
+// Story 1.4 : mon_profil() pour le membre connecté ; les fonctions de droits
+// de prive pour les règles RLS (sans accès au schéma prive lui-même).
+const DROITS_ATTENDUS: string[] = [
+  "authenticated:fonction:prive.est_admin():EXECUTE",
+  "authenticated:fonction:prive.est_membre_actif():EXECUTE",
+  "authenticated:fonction:public.mon_profil():EXECUTE",
+].sort();
 
 const ROLES = ["anon", "authenticated"];
 
@@ -84,7 +90,7 @@ describe("sécurité — droits de anon et authenticated", () => {
   });
 
   it("aucun droit sur public ni prive en dehors de la liste attendue", async () => {
-    expect(await droitsAccordes()).toEqual(DROITS_ATTENDUS);
+    expect((await droitsAccordes()).sort()).toEqual(DROITS_ATTENDUS);
   });
 
   it("un objet créé après la migration ne donne aucun droit (droits par défaut retirés)", async () => {
@@ -101,7 +107,7 @@ describe("sécurité — droits de anon et authenticated", () => {
       await client.query(
         "create function prive.test_verrou_droits_f() returns int language sql as 'select 1'",
       );
-      expect(await droitsAccordes()).toEqual(DROITS_ATTENDUS);
+      expect((await droitsAccordes()).sort()).toEqual(DROITS_ATTENDUS);
     } finally {
       await client.query("rollback");
     }
