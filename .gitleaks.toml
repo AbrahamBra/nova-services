@@ -1,0 +1,13 @@
+# Réglages de la recherche de secrets (gitleaks).
+# On garde toutes les règles par défaut, avec une seule exception justifiée.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Faux positifs vérifiés"
+paths = [
+  # Liste des fichiers BMAD avec leur empreinte SHA-256 : ce sont des empreintes
+  # de fichiers publics, pas des clés (faux positif « generic-api-key »).
+  '''_bmad/_config/files-manifest\.csv''',
+]
