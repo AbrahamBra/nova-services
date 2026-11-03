@@ -5,7 +5,8 @@ import { formaterDuree } from "@/lib/format";
 import { lireInfosPubliques } from "@/lib/infos-publiques";
 
 // Formulaire public « Déposer une demande » (EXPERIENCE.md §9.1).
-// Jamais mise en cache : les catégories et les paramètres peuvent changer.
+// Jamais mise en cache : les catégories et les paramètres peuvent changer, et
+// chaque affichage reçoit une nouvelle clé d'envoi.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -34,6 +35,8 @@ export default async function Accueil() {
             categories={infos.donnees.categories}
             emailContact={infos.donnees.emailContact}
             dureeConservation={formaterDuree(infos.donnees.dureeConservationMois)}
+            // Clé anti-doublon, nouvelle à chaque affichage (AD-26).
+            cleEnvoi={crypto.randomUUID()}
           />
         </>
       ) : (

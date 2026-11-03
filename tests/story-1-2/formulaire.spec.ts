@@ -52,7 +52,11 @@ test.describe("formulaire de dépôt", () => {
   });
 
   test("propose les 5 catégories de départ, dans l'ordre", async ({ page }) => {
-    const options = page.getByLabel("Catégorie", { exact: true }).locator("option:not([disabled])");
+    // Les catégories « TEST- » créées par d'autres tests en parallèle sont ignorées.
+    const options = page
+      .getByLabel("Catégorie", { exact: true })
+      .locator("option:not([disabled])")
+      .filter({ hasNotText: /^TEST-/ });
     await expect(options).toHaveText(CATEGORIES_DE_DEPART);
   });
 
@@ -82,7 +86,7 @@ test.describe("formulaire de dépôt", () => {
     await expect(page.getByText(`12 / 5${NB}000`, { exact: true })).toBeVisible();
   });
 
-  test("le bouton « Envoyer ma demande » est visible, bleu marine, coins 6 px, sans effet", async ({
+  test("le bouton « Envoyer ma demande » est visible, bleu marine, coins 6 px", async ({
     page,
   }, testInfo) => {
     const bouton = page.getByRole("button", { name: "Envoyer ma demande" });
@@ -111,7 +115,8 @@ test.describe("formulaire de dépôt", () => {
     );
     await expect(page.getByLabel("Catégorie", { exact: true })).toHaveCSS("border-radius", "6px");
 
-    // Story 1.3 : l'envoi n'existe pas encore. Ni requête ni rechargement.
+    // Story 1.3 : formulaire incomplet → erreurs vérifiées à l'écran, sans
+    // requête ni rechargement, saisie conservée.
     await page.getByLabel("Objet", { exact: true }).fill("Saisie conservée");
     const requetes: string[] = [];
     page.on("request", (requete) => {
@@ -121,6 +126,7 @@ test.describe("formulaire de dépôt", () => {
     await page.waitForTimeout(300);
     expect(requetes).toEqual([]);
     await expect(page).toHaveURL("/");
+    await expect(page.getByText("Indiquez votre nom et prénom.")).toBeVisible();
     await expect(page.getByLabel("Objet", { exact: true })).toHaveValue("Saisie conservée");
   });
 

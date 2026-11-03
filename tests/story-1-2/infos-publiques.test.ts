@@ -26,6 +26,9 @@ const CATEGORIES_DE_DEPART = [
   "Autre",
 ];
 
+// Ignore les catégories « TEST- » qu'un autre test peut créer au même moment.
+const sansTest = (noms: string[]) => noms.filter((nom) => !nom.startsWith("TEST-"));
+
 function variable(nom: string): string {
   const valeur = process.env[nom];
   if (!valeur) throw new Error(`${nom} manquant dans .env.local.`);
@@ -38,7 +41,9 @@ describe("infos_publiques — avec la clé secrète (serveur)", () => {
 
     expect(resultat.ok).toBe(true);
     if (!resultat.ok) return;
-    expect(resultat.donnees.categories.map((c) => c.nom)).toEqual(CATEGORIES_DE_DEPART);
+    expect(sansTest(resultat.donnees.categories.map((c) => c.nom))).toEqual(
+      CATEGORIES_DE_DEPART,
+    );
     for (const categorie of resultat.donnees.categories) {
       expect(categorie.id).toMatch(/^[0-9a-f-]{36}$/);
     }
@@ -107,7 +112,7 @@ describe("infos_publiques — règles d'affichage (SQL, transaction annulée)", 
     const infos = await dansTransactionAnnulee(
       "update public.categories set actif = false where nom = 'Problème technique'",
     );
-    expect(infos.categories.map((c) => c.nom)).toEqual(
+    expect(sansTest(infos.categories.map((c) => c.nom))).toEqual(
       CATEGORIES_DE_DEPART.filter((nom) => nom !== "Problème technique"),
     );
   });
