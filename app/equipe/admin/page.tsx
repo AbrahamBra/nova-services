@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AccesRefuse } from "@/components/nova/acces-refuse";
 import { lireProfil } from "@/lib/session";
 
@@ -23,6 +24,14 @@ export default async function AccueilAdmin() {
       <p className="mt-3 text-[15px] leading-normal text-muted-foreground">
         Les outils d&apos;administration (comptes, catégories, paramètres, données personnelles et
         journal) apparaîtront ici au fil des prochaines versions.
+      </p>
+      <p className="mt-6 text-[15px] leading-normal">
+        <Link
+          href="/equipe/admin/test-erreur"
+          className="font-medium text-primary underline underline-offset-4 outline-none hover:text-primary-hover focus-visible:rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          Page de test du suivi des erreurs
+        </Link>
       </p>
     </div>
   );

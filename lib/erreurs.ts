@@ -28,6 +28,8 @@ export const MESSAGES_ERREUR = {
   // Story 1.8 — champ piège rempli (action `deposer`, propre à
   // l'application) : message neutre, qui ne dit jamais pourquoi.
   ENVOI_IMPOSSIBLE: "Votre demande n'a pas pu être envoyée. Réessayez plus tard.",
+  // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
+  ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
@@ -37,6 +39,7 @@ export const CODES_APPLICATION: readonly CodeErreur[] = [
   "ERREUR_INATTENDUE",
   "CONNEXION_REFUSEE",
   "ENVOI_IMPOSSIBLE",
+  "ACCES_REFUSE",
 ];
 
 export const CODES_ERREUR = Object.keys(MESSAGES_ERREUR) as CodeErreur[];

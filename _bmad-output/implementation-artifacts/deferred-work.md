@@ -58,3 +58,13 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
   summary: Vérifier que `donnees.sql` contient bien les comptes (`auth.users`) — non vérifié.
   evidence: Si absents, les membres restaurés n'auraient pas de compte ; à prouver pendant la restauration réelle (story 3.4).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
+  summary: Vérifier en production (Netlify) que les erreurs arrivent dans Sentry sans perte (flush des fonctions) et en un seul exemplaire.
+  evidence: Non vérifiable en développement ; critère « moins de 5 minutes » à refaire en story 3.1.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
+  summary: Au build Netlify, nommer la version Sentry comme `NEXT_PUBLIC_APP_VERSION`, supprimer les cartes du code source après envoi, et n'envoyer que si org et projet sont remplis.
+  evidence: `withSentryConfig` n'est actif qu'avec `SENTRY_AUTH_TOKEN` sur Netlify (story 3.1).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
+  summary: Envoyer aussi à Sentry les erreurs imprévues qui ne passent pas par `appeler()` (`lib/session.ts`, `lib/demandes.ts`, `lib/detail-demande.ts`, `lib/actions/demandes.ts`).
+  evidence: Elles ne laissent qu'une ligne de console ; `lib/actions/` était interdit à cette session.
