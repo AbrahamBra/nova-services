@@ -28,6 +28,10 @@ export const MESSAGES_ERREUR = {
   // Story 1.8 — champ piège rempli (action `deposer`, propre à
   // l'application) : message neutre, qui ne dit jamais pourquoi.
   ENVOI_IMPOSSIBLE: "Votre demande n'a pas pu être envoyée. Réessayez plus tard.",
+  // Story 1.9 — blocage après 5 échecs de connexion de suite en 15 minutes,
+  // pour le même email ou la même IP (commencer_connexion). Affiché aussi au
+  // 5ᵉ échec (terminer_connexion renvoie `bloquee`).
+  CONNEXION_BLOQUEE: "Trop de tentatives. Réessayez dans 15 minutes.",
   // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
   ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
 } as const;

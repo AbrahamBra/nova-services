@@ -418,6 +418,8 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
        order by 1`,
     );
     expect(rows.map((ligne) => ligne.fonction)).toEqual([
+      // Story 1.9 : blocage de la connexion (action `connexion`).
+      "commencer_connexion",
       // Story 1.4 : création des membres (scripts, puis invitations).
       "creer_membre",
       "deposer_demande",
@@ -427,6 +429,8 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
       "nombre_administrateurs_actifs",
       // Story 1.7 : résultat de l'email de confirmation.
       "noter_resultat_email",
+      // Story 1.9 : résultat d'une tentative de connexion.
+      "terminer_connexion",
     ]);
   });
 

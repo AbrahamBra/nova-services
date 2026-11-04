@@ -69,6 +69,15 @@ export function empreinteIp(ip: string, env: Environnement = process.env): strin
   return cle === null ? null : calculerEmpreinte("ip", ip, cle);
 }
 
+/**
+ * Empreinte d'un email de connexion (story 1.9), passé en minuscules et sans
+ * espaces, ou null si aucun secret n'est disponible (production).
+ */
+export function empreinteEmail(email: string, env: Environnement = process.env): string | null {
+  const cle = lireCleHmac(env);
+  return cle === null ? null : calculerEmpreinte("email", email.trim().toLowerCase(), cle);
+}
+
 /** Tests seulement : oublie la clé de repli (comme un redémarrage du serveur). */
 export function oublierCleDeRepli(): void {
   cleDeRepli = null;

@@ -46,6 +46,16 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-8-bloquer-les-envois-en-masse.md`
   summary: HMAC_SECRET à poser sur Netlify (tous les contextes) et alerte si absent ; vérifier x-nf-client-connection-ip sur une prévisualisation.
   evidence: sans secret en production, chaque dépôt renvoie ERREUR_INATTENDUE avec une simple trace console ; sans secret en prévisualisation, chaque instance tire sa propre clé (story 3.1, 3.3).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-9-securiser-la-connexion.md`
+  summary: La limite de 8 h n'est appliquée que par proxy.ts ; les jetons restent utilisables directement auprès de Supabase.
+  evidence: rien dans la base ne lit l'horodatage `amr` ; la limite de session de Supabase est réservée à l'offre payante.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-9-securiser-la-connexion.md`
+  summary: Le compte d'un membre peut être bloqué volontairement par n'importe qui ; le journal n'indique pas quel membre, et il n'y a pas de déblocage.
+  evidence: la ligne de journal `connexion_bloquee` n'a ni email ni identifiant ; aucune action d'administration ne lève un blocage.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-9-securiser-la-connexion.md`
+  summary: Ajouter `tentatives_connexion` (plus d'un jour) et `envois_formulaire` (plus d'une heure) à `purger_technique`.
+  evidence: l'effacement n'a lieu qu'à la connexion ou au dépôt suivant (AD-23).
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
   summary: Documenter que GitHub suspend les tâches planifiées après 60 jours sans activité (sauvegarde et réveil), avec un rappel de surveillance.
   evidence: Limite de l'offre gratuite (epic-3-context) ; à écrire dans la fiche de maintenance, story 3.6.
