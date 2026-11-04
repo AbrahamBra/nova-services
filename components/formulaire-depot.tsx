@@ -21,6 +21,7 @@ import { deposer } from "@/lib/actions/demandes";
 import { messageErreur } from "@/lib/erreurs";
 import { formaterNombre } from "@/lib/format";
 import {
+  CHAMP_PIEGE,
   ETAT_DEPOT_INITIAL,
   type EtatDepot,
   LONGUEURS_MAX,
@@ -200,6 +201,22 @@ export function FormulaireDepot({ categories, emailContact, dureeConservation, c
       }}
     >
       <input type="hidden" name="cle_envoi" value={cleEnvoi} />
+
+      {/* Champ piège (story 1.8) : hors de l'écran (pas display:none, que
+          certains robots savent éviter), ignoré par les lecteurs d'écran,
+          hors du parcours clavier, sans saisie automatique. Un humain le
+          laisse vide ; s'il est rempli, l'action n'enregistre rien. */}
+      <div aria-hidden="true" className="absolute -left-[10000px] top-auto size-px overflow-hidden">
+        <label htmlFor={`${id}-${CHAMP_PIEGE}`}>Site web</label>
+        <input
+          id={`${id}-${CHAMP_PIEGE}`}
+          type="text"
+          name={CHAMP_PIEGE}
+          tabIndex={-1}
+          autoComplete="off"
+          defaultValue=""
+        />
+      </div>
 
       {erreurGenerale ? (
         <div

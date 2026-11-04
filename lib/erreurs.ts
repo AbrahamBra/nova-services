@@ -23,6 +23,11 @@ export const MESSAGES_ERREUR = {
   // confirmation (AD-13).
   EMAIL_DEJA_NOTE: "Le résultat de l'email de confirmation est déjà noté.",
   DEMANDE_INTROUVABLE: "Demande introuvable. Elle a peut-être été effacée.",
+  // Story 1.8 — limite d'envois du formulaire public (deposer_demande).
+  TROP_D_ENVOIS: "Trop d'envois depuis votre connexion. Réessayez dans quelques minutes.",
+  // Story 1.8 — champ piège rempli (action `deposer`, propre à
+  // l'application) : message neutre, qui ne dit jamais pourquoi.
+  ENVOI_IMPOSSIBLE: "Votre demande n'a pas pu être envoyée. Réessayez plus tard.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
@@ -31,6 +36,7 @@ export type CodeErreur = keyof typeof MESSAGES_ERREUR;
 export const CODES_APPLICATION: readonly CodeErreur[] = [
   "ERREUR_INATTENDUE",
   "CONNEXION_REFUSEE",
+  "ENVOI_IMPOSSIBLE",
 ];
 
 export const CODES_ERREUR = Object.keys(MESSAGES_ERREUR) as CodeErreur[];

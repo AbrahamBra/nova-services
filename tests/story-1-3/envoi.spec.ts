@@ -3,6 +3,7 @@ import { loadEnvConfig } from "@next/env";
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
 import { verifierEnvironnement } from "../garde-environnement";
+import { utiliserIpDeTest } from "../outils/ip-test";
 
 // Story 1.3 — envoi du formulaire et page de confirmation (navigateur).
 // Nécessite la migration 20261103000003 appliquée sur nova-dev.
@@ -10,6 +11,12 @@ import { verifierEnvironnement } from "../garde-environnement";
 // effacées à la fin.
 
 loadEnvConfig(process.cwd(), true, { info: () => {}, error: console.error });
+
+// Story 1.8 : chaque test dépose avec sa propre IP (limite de 5 envois en
+// 10 minutes par IP).
+test.beforeEach(async ({ context }) => {
+  await utiliserIpDeTest(context);
+});
 
 const noms: string[] = [];
 

@@ -114,6 +114,19 @@ export type SaisieDepot = Omit<z.input<typeof schemaDepot>, "consentement"> & {
 /** Données validées et nettoyées, prêtes pour `deposer_demande`. */
 export type DonneesDepot = z.output<typeof schemaDepot>;
 
+/**
+ * Champ piège (story 1.8) : invisible pour les humains, hors du parcours
+ * clavier et ignoré par les lecteurs d'écran ; les robots le remplissent.
+ * Hors du schéma Zod : l'action `deposer` le vérifie avant tout le reste.
+ */
+export const CHAMP_PIEGE = "site_web";
+
+/** Vrai si le champ piège contient quelque chose (même des espaces). */
+export function champPiegeRempli(formulaire: FormData): boolean {
+  const valeur = formulaire.get(CHAMP_PIEGE);
+  return valeur !== null && (typeof valeur !== "string" || valeur !== "");
+}
+
 /** Lit la saisie dans le FormData du formulaire (écran et action). */
 export function lireSaisieDepot(formulaire: FormData): SaisieDepot {
   const texte = (nom: string) => {

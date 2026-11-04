@@ -37,6 +37,15 @@
   summary: Créer le compte Resend, renseigner `RESEND_API_KEY` et `EMAILS_AUTORISES` dans `.env.local`, puis vérifier la réception réelle de l'email (critère 1 de la story 1.7).
   evidence: Reporté par Abraham ; le mode démonstration fonctionne sans clé. À faire avant la mise en ligne (story 3.1).
 
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-8-bloquer-les-envois-en-masse.md`
+  summary: Les empreintes d'IP ne sont effacées qu'au dépôt suivant ; sans trafic, elles restent au-delà d'une heure.
+  evidence: le delete est dans deposer_demande, après un dépôt accepté ; une purge planifiée (pg_cron ou tâche Supabase) garantirait AD-23.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-8-bloquer-les-envois-en-masse.md`
+  summary: En IPv6, chaque adresse d'un même client compte à part (pas de regroupement /64 ni de normalisation de l'écriture).
+  evidence: lireAdresseIp passe la chaîne brute au HMAC ; un client IPv6 peut changer d'adresse dans son préfixe pour contourner la limite.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-8-bloquer-les-envois-en-masse.md`
+  summary: HMAC_SECRET à poser sur Netlify (tous les contextes) et alerte si absent ; vérifier x-nf-client-connection-ip sur une prévisualisation.
+  evidence: sans secret en production, chaque dépôt renvoie ERREUR_INATTENDUE avec une simple trace console ; sans secret en prévisualisation, chaque instance tire sa propre clé (story 3.1, 3.3).
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
   summary: Documenter que GitHub suspend les tâches planifiées après 60 jours sans activité (sauvegarde et réveil), avec un rappel de surveillance.
   evidence: Limite de l'offre gratuite (epic-3-context) ; à écrire dans la fiche de maintenance, story 3.6.

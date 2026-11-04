@@ -1,19 +1,23 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect, RedirectType } from "next/navigation";
 import { messageErreur } from "@/lib/erreurs";
+import { lireAdresseIp } from "@/lib/server/adresse-ip";
 import { appeler, type ClientRpc } from "@/lib/server/appeler";
 import { envoyerConfirmation } from "@/lib/server/emails";
+import { empreinteIp } from "@/lib/server/empreintes";
 import { creerClientService } from "@/lib/server/supabase-service";
 import {
+  champPiegeRempli,
   lireSaisieDepot,
   verifierDepot,
   type EtatDepot,
 } from "@/lib/schemas/depot";
 
 // Actions serveur sur les demandes (AD-7). Story 1.3 : dépôt public ;
-// story 1.7 : email de confirmation. À venir : champ piège et limite
-// d'envois (story 1.8).
+// story 1.7 : email de confirmation ; story 1.8 : champ piège et limite
+// d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base).
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -119,12 +123,39 @@ function erreurGenerale(etat: EtatDepot, message: string): EtatDepot {
 }
 
 /**
- * Dépôt public : Zod → `deposer_demande` (clé secrète) → email de
+ * Empreinte HMAC de l'IP du visiteur (AD-14), ou null si elle ne peut pas
+ * être calculée (secret absent en production, en-tête Netlify absent).
+ * L'IP n'est jamais tracée ; seules les causes le sont.
+ */
+async function empreinteDuVisiteur(): Promise<string | null> {
+  try {
+    const ip = lireAdresseIp(await headers());
+    if (ip === null) {
+      console.error("[deposer] adresse IP introuvable dans les en-têtes");
+      return null;
+    }
+    return empreinteIp(ip);
+  } catch (erreur) {
+    const nom = erreur instanceof Error ? erreur.name : typeof erreur;
+    console.error(`[deposer] exception pendant le calcul de l'empreinte d'IP : ${nom}`);
+    return null;
+  }
+}
+
+/**
+ * Dépôt public (AD-16) : champ piège → Zod → `deposer_demande` (clé secrète,
+ * avec l'empreinte d'IP : la base applique la limite d'envois) → email de
  * confirmation → `noter_resultat_email` → page de confirmation. En cas
  * d'erreur du dépôt, renvoie les messages à afficher ; la saisie reste dans
  * le formulaire. L'email ne fait jamais échouer le dépôt.
  */
 export async function deposer(etat: EtatDepot, formulaire: FormData): Promise<EtatDepot> {
+  // Champ piège rempli : rien n'est enregistré, message neutre sans la raison.
+  if (champPiegeRempli(formulaire)) {
+    console.warn("[deposer] champ piège rempli");
+    return erreurGenerale(etat, messageErreur("ENVOI_IMPOSSIBLE"));
+  }
+
   const verification = verifierDepot(lireSaisieDepot(formulaire));
   if (!verification.ok) {
     // Clé falsifiée : les messages sous les champs ne la corrigeraient pas.
@@ -135,6 +166,11 @@ export async function deposer(etat: EtatDepot, formulaire: FormData): Promise<Et
   }
 
   const d = verification.donnees;
+
+  const empreinte = await empreinteDuVisiteur();
+  if (empreinte === null) {
+    return erreurGenerale(etat, messageErreur("ERREUR_INATTENDUE"));
+  }
 
   let client;
   try {
@@ -154,6 +190,7 @@ export async function deposer(etat: EtatDepot, formulaire: FormData): Promise<Et
     p_objet: d.objet,
     p_description: d.description,
     p_consentement: d.consentement,
+    p_empreinte_ip: empreinte,
   });
 
   if (!resultat.ok) {
@@ -170,6 +207,10 @@ export async function deposer(etat: EtatDepot, formulaire: FormData): Promise<Et
           erreurGenerale: null,
           tentative: etat.tentative + 1,
         };
+      case "TROP_D_ENVOIS":
+        // Bandeau, saisie conservée, pas de confirmation. Trace sans IP ni saisie.
+        console.warn("[deposer] limite d'envois atteinte");
+        return erreurGenerale(etat, resultat.message);
       default:
         return erreurGenerale(etat, resultat.message);
     }

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { Client, type DatabaseError } from "pg";
+import { empreinteDeTest } from "../outils/ip-test";
 import { CANAUX, ETATS_EMAIL, PRIORITES, STATUTS, TYPES_HISTORIQUE } from "@/lib/domaine";
 
 // Story 1.3 — `deposer_demande` et `lire_confirmation` sur le projet de
@@ -13,7 +14,7 @@ import { CANAUX, ETATS_EMAIL, PRIORITES, STATUTS, TYPES_HISTORIQUE } from "@/lib
 
 const PREFIXE = `TEST-1.3-${crypto.randomUUID().slice(0, 8)}`;
 const SIGNATURE =
-  "public.deposer_demande(uuid, text, text, text, text, uuid, text, text, boolean)";
+  "public.deposer_demande(uuid, text, text, text, text, uuid, text, text, boolean, text)";
 
 function variable(nom: string): string {
   const valeur = process.env[nom];
@@ -72,8 +73,20 @@ async function deposer(
   d: Depot,
 ): Promise<{ reference: string; jeton: string }> {
   const { rows } = await client.query(
-    `select public.deposer_demande($1, $2, $3, $4, $5, $6, $7, $8, $9) as r`,
-    [d.cle_envoi, d.nom, d.email, d.telephone, d.societe, d.categorie_id, d.objet, d.description, d.consentement],
+    `select public.deposer_demande($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) as r`,
+    [
+      d.cle_envoi,
+      d.nom,
+      d.email,
+      d.telephone,
+      d.societe,
+      d.categorie_id,
+      d.objet,
+      d.description,
+      d.consentement,
+      // Empreinte d'IP propre à chaque appel (story 1.8) : jamais la limite.
+      empreinteDeTest(),
+    ],
   );
   return rows[0].r;
 }
@@ -434,6 +447,7 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
       p_objet: d.objet,
       p_description: d.description,
       p_consentement: true,
+      p_empreinte_ip: empreinteDeTest(),
     });
     expect(depotVisiteur.data).toBeNull();
     expect(["42501", "PGRST202"]).toContain(depotVisiteur.error?.code);
@@ -466,6 +480,7 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
       p_objet: d.objet,
       p_description: d.description,
       p_consentement: true,
+      p_empreinte_ip: empreinteDeTest(),
     });
     expect(error).toBeNull();
     expect(data.reference).toMatch(FORMAT_REFERENCE);
