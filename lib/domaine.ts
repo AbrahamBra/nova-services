@@ -129,7 +129,8 @@ export type NatureValeurHistorique = "canal" | "membre" | "statut" | "priorite" 
 
 export const NATURE_VALEUR_HISTORIQUE: Record<TypeHistorique, NatureValeurHistorique> = {
   creation: "canal",
-  prise_en_charge: "membre",
+  // Story 2.1 : passage de statut `nouvelle` → `en_cours` (une seule ligne).
+  prise_en_charge: "statut",
   attribution: "membre",
   liberation: "membre",
   changement_statut: "statut",
@@ -149,6 +150,22 @@ function passage({ ancienne, nouvelle }: ValeursHistorique): string {
   return "";
 }
 
+/**
+ * Début de phrase placé AVANT l'auteur, pour les types dont la phrase ne
+ * commence pas par l'auteur : « <début><auteur> <phrase> ».
+ */
+export const AVANT_AUTEUR_HISTORIQUE: Partial<Record<TypeHistorique, string>> = {
+  prise_en_charge: "Prise en charge par ",
+};
+
+/**
+ * Types dont le passage (« : Nouvelle → En cours ») est omis quand les
+ * valeurs stockées ne sont pas des codes connus : anciennes lignes
+ * `prise_en_charge` (identifiant du membre dans `nouvelle_valeur`), affichées
+ * « Prise en charge par [nom] ».
+ */
+export const TYPES_PASSAGE_OMIS_SI_INCONNU: readonly TypeHistorique[] = ["prise_en_charge"];
+
 export const PHRASES_HISTORIQUE: Record<
   TypeHistorique,
   (valeurs: ValeursHistorique, auteurEstDemandeur: boolean) => string
@@ -160,7 +177,9 @@ export const PHRASES_HISTORIQUE: Record<
       ? `a saisi la demande (${nouvelle.toLocaleLowerCase("fr-FR")})`
       : "a saisi la demande";
   },
-  prise_en_charge: () => "a pris en charge la demande",
+  // Auteur au milieu de la phrase (voir AVANT_AUTEUR_HISTORIQUE) :
+  // « Prise en charge par Karim Benali : Nouvelle → En cours ».
+  prise_en_charge: (valeurs) => passage(valeurs).trimStart(),
   attribution: ({ nouvelle }) =>
     nouvelle ? `a attribué la demande à ${nouvelle}` : "a attribué la demande",
   liberation: () => "a libéré la demande",

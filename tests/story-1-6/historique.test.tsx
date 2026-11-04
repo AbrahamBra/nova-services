@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Historique, texteLigneHistorique } from "@/components/nova/historique";
+import { Historique, phraseLigneHistorique } from "@/components/nova/historique";
 import type { LigneHistorique } from "@/lib/detail-demande";
 import { PHRASES_HISTORIQUE, TYPES_HISTORIQUE, type TypeHistorique } from "@/lib/domaine";
 
@@ -32,8 +32,7 @@ function ligne(type: TypeHistorique, modifs: Partial<LigneHistorique> = {}): Lig
 }
 
 function texte(l: LigneHistorique): string {
-  const { auteur, action } = texteLigneHistorique(l, noms);
-  return `${auteur} ${action}`;
+  return phraseLigneHistorique(l, noms);
 }
 
 describe("historique — phrases des 10 types", () => {
@@ -51,7 +50,11 @@ describe("historique — phrases des 10 types", () => {
       ligne("creation", { auteurId: NADIA, nouvelleValeur: "telephone" }),
       "Nadia Morel a saisi la demande (téléphone)",
     ],
-    [ligne("prise_en_charge", { nouvelleValeur: KARIM }), "Karim Benali a pris en charge la demande"],
+    // Story 2.1 : une seule ligne, auteur au milieu de la phrase.
+    [
+      ligne("prise_en_charge", { ancienneValeur: "nouvelle", nouvelleValeur: "en_cours" }),
+      "Prise en charge par Karim Benali : Nouvelle → En cours",
+    ],
     [
       ligne("attribution", { nouvelleValeur: NADIA }),
       "Karim Benali a attribué la demande à Nadia Morel",
@@ -127,6 +130,27 @@ describe("composant Historique", () => {
     expect(html).toContain("<b class=\"font-semibold\">Demandeur (formulaire)</b> a créé la demande");
     expect(html).toContain("<b class=\"font-semibold\">Karim Benali</b> a changé la priorité : Normale → Haute");
     expect(html.indexOf("a créé la demande")).toBeLessThan(html.indexOf("a changé la priorité"));
+  });
+
+  it("prise en charge : « Prise en charge par <b>auteur</b> : Nouvelle → En cours »", () => {
+    const html = renderToStaticMarkup(
+      <Historique
+        {...noms}
+        lignes={[ligne("prise_en_charge", { ancienneValeur: "nouvelle", nouvelleValeur: "en_cours" })]}
+      />,
+    );
+    expect(html).toContain(
+      "Prise en charge par <b class=\"font-semibold\">Karim Benali</b> : Nouvelle → En cours",
+    );
+  });
+
+  it("prise en charge à l'ancien format (identifiant du membre) : « Prise en charge par [nom] », sans « ? »", () => {
+    const ancienne = ligne("prise_en_charge", { ancienneValeur: null, nouvelleValeur: KARIM });
+    expect(texte(ancienne)).toBe("Prise en charge par Karim Benali");
+    const html = renderToStaticMarkup(<Historique {...noms} lignes={[ancienne]} />);
+    expect(html).toContain("Prise en charge par <b class=\"font-semibold\">Karim Benali</b></span>");
+    expect(html).not.toContain("?");
+    expect(html).not.toContain(KARIM);
   });
 
   it("lignes illisibles : « 1 événement illisible » sous l'historique", () => {

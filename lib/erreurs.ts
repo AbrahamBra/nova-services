@@ -32,6 +32,13 @@ export const MESSAGES_ERREUR = {
   // pour le même email ou la même IP (commencer_connexion). Affiché aussi au
   // 5ᵉ échec (terminer_connexion renvoie `bloquee`).
   CONNEXION_BLOQUEE: "Trop de tentatives. Réessayez dans 15 minutes.",
+  // Story 2.1 — traitement des demandes (prendre_en_charge, puis les
+  // fonctions des stories suivantes de l'epic 2).
+  DROIT_INSUFFISANT: "Vous n'avez pas le droit de faire cette action.",
+  // Message de repli : l'action affiche « Déjà prise en charge par [nom]. »
+  // quand la base donne le nom du responsable (détail de l'erreur).
+  DEJA_PRISE: "Déjà prise en charge par un autre membre de l'équipe.",
+  PASSAGE_INTERDIT: "Ce changement de statut n'est pas autorisé.",
   // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
   ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
 } as const;

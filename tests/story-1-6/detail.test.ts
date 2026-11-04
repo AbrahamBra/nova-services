@@ -66,8 +66,7 @@ beforeAll(async () => {
     `insert into public.historique
        (demande_id, auteur_type, auteur_id, type, ancienne_valeur, nouvelle_valeur, cree_le)
      values
-       ($1, 'membre', $2::uuid, 'prise_en_charge', null, $2::text, now() + interval '1 minute'),
-       ($1, 'membre', $2::uuid, 'changement_statut', 'nouvelle', 'en_cours', now() + interval '1 minute'),
+       ($1, 'membre', $2::uuid, 'prise_en_charge', 'nouvelle', 'en_cours', now() + interval '1 minute'),
        ($1, 'membre', $2::uuid, 'changement_priorite', 'normale', 'haute', now() + interval '2 minutes')`,
     [demande.id, collaborateur.id],
   );
@@ -134,7 +133,6 @@ describe("historique — membre actif", () => {
     expect(data!.map((l) => l.type)).toEqual([
       "creation",
       "prise_en_charge",
-      "changement_statut",
       "changement_priorite",
     ]);
     expect(data![0]).toMatchObject({ auteur_type: "demandeur", auteur_id: null, nouvelle_valeur: "formulaire" });
@@ -173,7 +171,6 @@ describe("lireDetailAvec — membre actif", () => {
     expect(d.historique.map((l) => l.type)).toEqual([
       "creation",
       "prise_en_charge",
-      "changement_statut",
       "changement_priorite",
     ]);
     expect(d.nomsMembres[collaborateur.id]).toBe(collaborateur.nom);
