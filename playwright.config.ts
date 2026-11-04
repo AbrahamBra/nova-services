@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3000;
+// Port du serveur de test. Autre valeur (PORT_E2E) quand un autre dossier de
+// travail occupe déjà le 3000 : sinon Playwright testerait son serveur.
+const PORT = Number(process.env.PORT_E2E ?? 3000);
 const enCI = !!process.env.CI;
 
 export default defineConfig({

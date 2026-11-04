@@ -1,0 +1,200 @@
+name: Sauvegarde nocturne
+
+# Exporte chaque nuit la base Supabase en trois fichiers (rôles, structure,
+# données), les chiffre avec la phrase secrète SAUVEGARDE_PHRASE et garde le
+# fichier chiffré 30 jours (OPS-3, AD-12). Le dépôt est public : seul le
+# fichier chiffré est publié, et les journaux n'affichent aucune donnée.
+#
+# Cible : la production si le secret PROD_SUPABASE_DB_URL est rempli
+# (story 3.1), sinon le projet de développement (DEV_SUPABASE_DB_URL).
+#
+# À ajouter ensuite (AD-23) : l'appel nocturne de `purger_technique`, dès que
+# la fonction existera (migration faite par la session principale).
+
+on:
+  schedule:
+    # 2 h UTC : 3 h à Paris en hiver, 4 h en été.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+  # Exécution d'essai à chaque modification de ce fichier (décision Q1).
+  push:
+    paths:
+      - .github/workflows/sauvegarde-nocturne.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sauvegarde-nocturne
+  cancel-in-progress: false
+
+jobs:
+  sauvegarde:
+    name: Exporter, chiffrer et vérifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        # -eo pipefail : une erreur au milieu d'un « | » fait échouer l'étape.
+        shell: bash
+    env:
+      PROD_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+      DEV_DB_URL: ${{ secrets.DEV_SUPABASE_DB_URL }}
+      SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
+    steps:
+      - name: Vérifier la phrase de chiffrement
+        run: |
+          if [ -z "$SAUVEGARDE_PHRASE" ]; then
+            echo "::error::Phrase de chiffrement absente : créez le secret SAUVEGARDE_PHRASE. Rien n'a été exporté."
+            exit 1
+          fi
+          # Le dépôt est public : seule la phrase protège le fichier publié.
+          if [ "${#SAUVEGARDE_PHRASE}" -lt 32 ]; then
+            echo "::error::Phrase de chiffrement trop courte : 32 caractères au minimum. Rien n'a été exporté."
+            exit 1
+          fi
+          # gpg ne lit que la première ligne du fichier de phrase.
+          if [[ "$SAUVEGARDE_PHRASE" == *$'\n'* || "$SAUVEGARDE_PHRASE" == *$'\r'* ]]; then
+            echo "::error::Phrase de chiffrement refusée : elle ne doit contenir aucun retour à la ligne. Rien n'a été exporté."
+            exit 1
+          fi
+          echo "Phrase de chiffrement présente."
+
+      - name: Choisir la base à sauvegarder
+        id: cible
+        run: |
+          if [ -n "$PROD_DB_URL" ]; then
+            environnement=production
+            adresse="$PROD_DB_URL"
+          else
+            environnement=developpement
+            adresse="$DEV_DB_URL"
+          fi
+          if [ -z "$adresse" ]; then
+            echo "::error::Adresse de la base absente pour l'environnement $environnement."
+            exit 1
+          fi
+          # Pooler Supabase en mode session : hôte *.pooler.supabase.com, port 5432.
+          # (Le port 6543 est le mode transaction ; l'adresse directe db.*.supabase.co
+          # n'est pas joignable en IPv4 depuis GitHub.)
+          if [[ ! "$adresse" =~ ^postgres(ql)?://.+@([^@/:?]+):([0-9]+)/ ]] \
+            || [[ "${BASH_REMATCH[2]}" != *.pooler.supabase.com ]] \
+            || [ "${BASH_REMATCH[3]}" != "5432" ]; then
+            echo "::error::Adresse refusée pour l'environnement $environnement : pooler en mode session attendu (port 5432 de pooler.supabase.com). Rien n'a été exporté."
+            exit 1
+          fi
+          date_jour=$(date -u +%Y-%m-%d)
+          echo "environnement=$environnement" >> "$GITHUB_OUTPUT"
+          echo "artefact=sauvegarde-$environnement-$date_jour-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          echo "Environnement sauvegardé : $environnement" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          # Même version que package.json (supabase ~3.0.0).
+          version: 3.0.0
+
+      - name: Exporter la base (rôles, structure, données)
+        env:
+          ENVIRONNEMENT: ${{ steps.cible.outputs.environnement }}
+        run: |
+          if [ "$ENVIRONNEMENT" = production ]; then adresse="$PROD_DB_URL"; else adresse="$DEV_DB_URL"; fi
+          umask 077
+          dossier="$RUNNER_TEMP/sauvegarde"
+          mkdir -p "$dossier"
+          supabase db dump --remote="$adresse" --role-only -f "$dossier/roles.sql"
+          supabase db dump --remote="$adresse" -f "$dossier/structure.sql"
+          supabase db dump --remote="$adresse" --data-only --use-copy -f "$dossier/donnees.sql"
+          for fichier in roles.sql structure.sql donnees.sql; do
+            if [ ! -s "$dossier/$fichier" ]; then
+              echo "::error::Export vide : $fichier."
+              exit 1
+            fi
+          done
+          echo "Trois fichiers exportés, non vides."
+
+      - name: Chiffrer l'archive
+        run: |
+          umask 077
+          dossier="$RUNNER_TEMP/sauvegarde"
+          phrase="$RUNNER_TEMP/phrase"
+          # La phrase passe par un fichier temporaire (printf est interne au
+          # shell : elle n'apparaît dans aucun argument de programme).
+          printf '%s' "$SAUVEGARDE_PHRASE" > "$phrase"
+          ( cd "$dossier" && sha256sum roles.sql structure.sql donnees.sql > "$RUNNER_TEMP/empreintes" )
+          tar -C "$dossier" -czf - roles.sql structure.sql donnees.sql \
+            | gpg --batch --yes --no-symkey-cache --pinentry-mode loopback \
+                --passphrase-file "$phrase" \
+                --symmetric --cipher-algo AES256 \
+                -o "$RUNNER_TEMP/sauvegarde.tar.gz.gpg"
+          # Fichiers en clair supprimés avant toute vérification ou tout envoi.
+          rm -rf "$dossier"
+          mkdir -p "$RUNNER_TEMP/envoi"
+          mv "$RUNNER_TEMP/sauvegarde.tar.gz.gpg" "$RUNNER_TEMP/envoi/sauvegarde.tar.gz.gpg"
+          echo "Archive chiffrée (AES256)."
+
+      - name: Vérifier le fichier chiffré (AD-12)
+        run: |
+          umask 077
+          chiffre="$RUNNER_TEMP/envoi/sauvegarde.tar.gz.gpg"
+          phrase="$RUNNER_TEMP/phrase"
+          gpgconf --kill gpg-agent || true
+
+          # 1. Rien de lisible en clair (marqueurs longs : pas de faux positif
+          # sur des octets chiffrés aléatoires).
+          if grep -a -q -e 'CREATE TABLE' -e 'COPY public.' "$chiffre"; then
+            echo "::error::Le fichier chiffré contient du SQL en clair."
+            exit 1
+          fi
+          # Structure OpenPGP : paquet de clé symétrique puis données chiffrées.
+          # Seuls les en-têtes de paquets sont lus ; rien n'est affiché.
+          paquets=$(gpg --batch --no-symkey-cache --pinentry-mode loopback \
+              --passphrase-file "$phrase" --list-packets "$chiffre" 2>/dev/null \
+            | grep -E '^:[a-z ]+packet:' || true)
+          if ! grep -q '^:symkey enc packet:' <<< "$paquets" \
+            || ! grep -q -E '^:(encrypted data|aead encrypted) packet:' <<< "$paquets"; then
+            echo "::error::Le fichier n'a pas la structure d'un fichier chiffré par phrase (OpenPGP)."
+            exit 1
+          fi
+          echo "Structure chiffrée vérifiée."
+
+          # 2. Une mauvaise phrase est refusée.
+          mauvaise="$RUNNER_TEMP/mauvaise-phrase"
+          openssl rand -hex 32 > "$mauvaise"
+          if gpg --batch --yes --no-symkey-cache --pinentry-mode loopback \
+              --passphrase-file "$mauvaise" --decrypt -o /dev/null "$chiffre" 2>/dev/null; then
+            echo "::error::Le fichier s'est déchiffré avec une mauvaise phrase."
+            exit 1
+          fi
+          rm -f "$mauvaise"
+          echo "Mauvaise phrase refusée."
+
+          # 3. La bonne phrase redonne les trois fichiers, identiques.
+          verif="$RUNNER_TEMP/verification"
+          mkdir -p "$verif"
+          gpg --batch --yes --no-symkey-cache --pinentry-mode loopback \
+              --passphrase-file "$phrase" --decrypt "$chiffre" \
+            | tar -C "$verif" -xzf -
+          ( cd "$verif" && sha256sum --check --quiet "$RUNNER_TEMP/empreintes" )
+          rm -rf "$verif"
+          echo "Déchiffrement avec la bonne phrase : trois fichiers retrouvés, identiques."
+          echo "Vérifications du chiffrement réussies." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Supprimer les fichiers temporaires
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/phrase" "$RUNNER_TEMP/mauvaise-phrase" "$RUNNER_TEMP/sauvegarde" "$RUNNER_TEMP/verification" "$RUNNER_TEMP/empreintes"
+
+      - name: Conserver le fichier chiffré 30 jours
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.cible.outputs.artefact }}
+          path: ${{ runner.temp }}/envoi/sauvegarde.tar.gz.gpg
+          if-no-files-found: error
+          retention-days: 30
+          # Déjà compressé et chiffré.
+          compression-level: 0
+
+      - name: Résumé
+        env:
+          ARTEFACT: ${{ steps.cible.outputs.artefact }}
+        run: |
+          echo "Fichier chiffré conservé 30 jours : $ARTEFACT" >> "$GITHUB_STEP_SUMMARY"

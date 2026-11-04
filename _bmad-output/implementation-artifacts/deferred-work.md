@@ -33,3 +33,16 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-voir-toutes-les-demandes.md`
   summary: (TRAITÉ en story 1.6) Liste : la colonne Responsable déborde à 1 440 px (défilement horizontal) ; resserrer les colonnes.
   evidence: Constaté sur capture à 1 440 px de large avec le menu ouvert.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Documenter que GitHub suspend les tâches planifiées après 60 jours sans activité (sauvegarde et réveil), avec un rappel de surveillance.
+  evidence: Limite de l'offre gratuite (epic-3-context) ; à écrire dans la fiche de maintenance, story 3.6.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Épingler les actions GitHub par empreinte de commit dans toutes les tâches qui voient des secrets.
+  evidence: `tests.yml`, `sauvegarde-nocturne.yml` et `reveil.yml` utilisent des étiquettes mobiles (`@v4`, `@v1`).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Sortir la garde d'adresse et le choix de l'environnement de la sauvegarde dans un script exécuté par un test (5 cas).
+  evidence: Le test actuel ne lit que le texte du fichier ; un `||` changé en `&&` passerait. À faire avec l'ajout de `purger_technique`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Vérifier que `donnees.sql` contient bien les comptes (`auth.users`) — non vérifié.
+  evidence: Si absents, les membres restaurés n'auraient pas de compte ; à prouver pendant la restauration réelle (story 3.4).
