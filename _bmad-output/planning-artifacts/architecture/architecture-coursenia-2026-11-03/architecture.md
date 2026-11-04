@@ -285,7 +285,7 @@ Seules les flèches dessinées sont permises.
   - Tous les emails partent de `lib/server/emails.ts`, via Resend. **Supabase Auth n'envoie aucun email** : les liens d'invitation et de réinitialisation, valables 24 h, sont générés par l'API d'administration (`generateLink`).
   - **Sans domaine acheté**, Resend n'envoie qu'à l'adresse du compte d'Abraham. Une liste `EMAILS_AUTORISES` fixe les destinataires possibles. Pour les autres, rien n'est envoyé et l'état est `non_envoye_demo`, affiché « Email non envoyé (mode démonstration) ». Pour une invitation ou une réinitialisation demandée par un administrateur, le lien lui est **affiché pour qu'il le copie**.
   - Les fonctions SQL renvoient les données de l'email. L'action l'envoie **après** l'enregistrement, puis appelle `noter_resultat_email`, qui fait passer `en_attente` à `envoye`, `echec`, `non_envoye_demo` ou `sans_email`.
-  - Passage en vraie production : vérifier un domaine dans Resend et vider `EMAILS_AUTORISES`, sans autre changement de code.
+  - Passage en vraie production, sans changement de code : vérifier un domaine dans Resend, puis `EMAIL_EXPEDITEUR` = une adresse de ce domaine (défaut `onboarding@resend.dev`) et `EMAILS_AUTORISES=*` (toutes les adresses) ; une liste vide signifie « personne » (démonstration).
 
 ### AD-14 — Pas de donnée personnelle dans les outils de suivi
 

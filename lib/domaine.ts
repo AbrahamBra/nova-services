@@ -58,6 +58,18 @@ export const LIBELLES_ETAT_EMAIL: Record<EtatEmail, string> = {
   sans_email: "Sans email",
 };
 
+/**
+ * États possibles après un envoi : seuls passages permis par
+ * `noter_resultat_email`, depuis `en_attente` (story 1.7, AD-13).
+ * `sans_email` est réservé à la saisie interne (story 2.6).
+ */
+export const ETATS_EMAIL_RESULTAT = [
+  "envoye",
+  "echec",
+  "non_envoye_demo",
+] as const satisfies readonly EtatEmail[];
+export type EtatEmailResultat = (typeof ETATS_EMAIL_RESULTAT)[number];
+
 export const TYPES_HISTORIQUE = [
   "creation",
   "prise_en_charge",
@@ -101,7 +113,6 @@ export const LIBELLES_TYPE_JOURNAL: Record<TypeJournal, string> = {
   email: "Email",
   connexion: "Connexion",
 };
-
 // Phrases de l'historique (AD-19, UX-DR11), affichées par le composant unique
 // `components/nova/historique.tsx` : « <auteur> <phrase> ».
 // Les valeurs stockées sont des codes ou des identifiants ; le composant les

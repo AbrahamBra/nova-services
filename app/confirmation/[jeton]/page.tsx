@@ -8,8 +8,8 @@ import { lireConfirmation } from "@/lib/confirmation";
 
 // Page de confirmation (EXPERIENCE.md §9.2, AD-16) : référence et contact de
 // Nova seulement, jamais le nom, l'email ni la description du demandeur.
-// Valable 24 h. Pas d'email de confirmation avant la story 1.7 : la phrase
-// « Un email de confirmation vous a été envoyé. » n'est donc jamais affichée.
+// Valable 24 h. La phrase « Un email de confirmation vous a été envoyé. »
+// (sans l'adresse) s'affiche seulement si l'email est parti (story 1.7).
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -66,7 +66,7 @@ export default async function PageConfirmation({ params }: PageProps<"/confirmat
     );
   }
 
-  const { reference, nomAffiche, emailContact } = resultat.donnees;
+  const { reference, nomAffiche, emailContact, etatEmail } = resultat.donnees;
 
   return (
     <Colonne nomAffiche={nomAffiche}>
@@ -95,6 +95,12 @@ export default async function PageConfirmation({ params }: PageProps<"/confirmat
         <p className="text-sm leading-normal text-foreground">
           Conservez-la pour tout échange avec notre équipe.
         </p>
+
+        {etatEmail === "envoye" ? (
+          <p className="mt-3 text-sm leading-normal text-foreground">
+            Un email de confirmation vous a été envoyé.
+          </p>
+        ) : null}
 
         <p className="mt-5 mb-6 text-[13px] leading-normal text-muted-foreground">
           Une question ? Contactez {nomAffiche}

@@ -16,6 +16,13 @@ const noms: string[] = [];
 test.beforeAll(() => {
   // Ces tests écrivent dans la base : jamais ailleurs qu'en développement.
   verifierEnvironnement(process.env.SUPABASE_ENVIRONNEMENT);
+  // Aucun envoi réel (story 1.7) : l'adresse de test ne doit pas être autorisée.
+  const autorisees = (process.env.EMAILS_AUTORISES ?? "")
+    .split(",")
+    .map((adresse) => adresse.trim().toLowerCase());
+  if (autorisees.includes("*") || autorisees.includes("sophie.garnier@example.com")) {
+    throw new Error("EMAILS_AUTORISES ne doit autoriser ni « * » ni l'adresse de test.");
+  }
 });
 
 test.afterAll(async () => {
@@ -117,7 +124,8 @@ test.describe("envoi d'une demande", () => {
     ).toBeVisible();
     await expect(page.getByRole("link", { name: "contact@nova-services.example" })).toBeVisible();
 
-    // Aucune donnée du demandeur, et pas encore d'email (story 1.7).
+    // Aucune donnée du demandeur. Adresse hors de EMAILS_AUTORISES : aucun email
+    // envoyé (mode démonstration, story 1.7), donc pas de phrase sur l'email.
     const texte = await page.locator("body").innerText();
     expect(texte).not.toContain(s.nom);
     expect(texte).not.toContain(s.email);

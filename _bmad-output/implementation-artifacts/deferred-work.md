@@ -33,6 +33,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-voir-toutes-les-demandes.md`
   summary: (TRAITÉ en story 1.6) Liste : la colonne Responsable déborde à 1 440 px (défilement horizontal) ; resserrer les colonnes.
   evidence: Constaté sur capture à 1 440 px de large avec le menu ouvert.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-7-email-de-confirmation.md`
+  summary: Créer le compte Resend, renseigner `RESEND_API_KEY` et `EMAILS_AUTORISES` dans `.env.local`, puis vérifier la réception réelle de l'email (critère 1 de la story 1.7).
+  evidence: Reporté par Abraham ; le mode démonstration fonctionne sans clé. À faire avant la mise en ligne (story 3.1).
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
   summary: Documenter que GitHub suspend les tâches planifiées après 60 jours sans activité (sauvegarde et réveil), avec un rappel de surveillance.

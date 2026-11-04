@@ -289,7 +289,9 @@ describe("deposer_demande — anti-doublon et envois simultanés", () => {
     const d = depot();
     const premier = await deposer(base, d);
     const second = await deposer(base, { ...d, objet: "Objet modifié" });
-    expect(second).toEqual(premier);
+    // Même demande ; seul le premier appel l'a créée (et envoie l'email, story 1.7).
+    expect(second).toEqual({ ...premier, nouvelle: false });
+    expect(premier).toMatchObject({ nouvelle: true, objet: d.objet });
 
     const { rows } = await base.query(
       "select count(*)::int as n, min(objet) as objet from public.demandes where cle_envoi = $1",
@@ -304,7 +306,9 @@ describe("deposer_demande — anti-doublon et envois simultanés", () => {
     try {
       const d = depot();
       const [a, b] = await Promise.all([deposer(base, d), deposer(autre, d)]);
-      expect(a).toEqual(b);
+      expect({ ...a, nouvelle: null }).toEqual({ ...b, nouvelle: null });
+      // Un seul des deux appels a créé la demande (un seul email, story 1.7).
+      expect([a, b].filter((r) => (r as { nouvelle?: boolean }).nouvelle === true)).toHaveLength(1);
       const { rows } = await base.query(
         "select count(*)::int as n from public.demandes where cle_envoi = $1",
         [d.cle_envoi],
@@ -339,6 +343,8 @@ describe("lire_confirmation", () => {
         reference,
         nom_affiche: "Nova Services",
         email_contact: "contact@nova-services.example",
+        // Story 1.7 : état de l'email, jamais une donnée du demandeur.
+        etat_email: "en_attente",
       });
     });
   });
@@ -406,6 +412,8 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
       "lire_confirmation",
       // Story 1.4 : garde-fou du script premier-admin.
       "nombre_administrateurs_actifs",
+      // Story 1.7 : résultat de l'email de confirmation.
+      "noter_resultat_email",
     ]);
   });
 

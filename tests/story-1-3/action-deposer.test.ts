@@ -60,7 +60,22 @@ describe("action deposer", () => {
     const appels: { fonction: string; parametres?: Record<string, unknown> }[] = [];
     simulation.rpc = (fonction, parametres) => {
       appels.push({ fonction, parametres });
-      return Promise.resolve({ data: { reference: "NOVA-2026-0042", jeton: JETON }, error: null });
+      // Second envoi de la même clé, email déjà noté : pas d'email (story 1.7,
+      // testée dans tests/story-1-7/emails.test.ts), un seul appel.
+      return Promise.resolve({
+        data: {
+          reference: "NOVA-2026-0042",
+          jeton: JETON,
+          id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          objet: "Impression impossible",
+          cree_le: "2026-11-03T08:12:00+00:00",
+          nom_affiche: "Nova Services",
+          email_contact: "contact@nova-services.example",
+          nouvelle: false,
+          etat_email: "envoye",
+        },
+        error: null,
+      });
     };
 
     await expect(deposer(ETAT_DEPOT_INITIAL, formulaire())).rejects.toMatchObject({
