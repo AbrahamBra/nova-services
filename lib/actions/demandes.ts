@@ -1,10 +1,11 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { headers } from "next/headers";
 import { redirect, RedirectType } from "next/navigation";
-import { messageErreur } from "@/lib/erreurs";
+import { messageErreur, type CodeErreur } from "@/lib/erreurs";
 import { lireAdresseIp } from "@/lib/server/adresse-ip";
-import { appeler, type ClientRpc } from "@/lib/server/appeler";
+import { appeler, type ClientRpc, type ResultatAction } from "@/lib/server/appeler";
 import { envoyerConfirmation } from "@/lib/server/emails";
 import { empreinteIp } from "@/lib/server/empreintes";
 import { creerClientService } from "@/lib/server/supabase-service";
@@ -14,10 +15,13 @@ import {
   verifierDepot,
   type EtatDepot,
 } from "@/lib/schemas/depot";
+import { schemaIdentifiantDemande } from "@/lib/schemas/traitement";
+import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur sur les demandes (AD-7). Story 1.3 : dépôt public ;
 // story 1.7 : email de confirmation ; story 1.8 : champ piège et limite
-// d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base).
+// d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base) ;
+// story 2.1 : prise en charge (traitement, avec la session du membre).
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -241,4 +245,68 @@ export async function deposer(etat: EtatDepot, formulaire: FormData): Promise<Et
   // Remplace l'adresse du formulaire dans l'historique du navigateur : un
   // retour arrière ne réaffiche pas le formulaire rempli avec la même clé.
   redirect(`/confirmation/${resultat.donnees.jeton}`, RedirectType.replace);
+}
+
+// --- Traitement des demandes (epic 2) ---------------------------------------
+// Avec la SESSION du membre connecté, jamais la clé secrète : la fonction SQL
+// vérifie elle-même le droit (membre actif) et la règle (AD-4, AD-15).
+
+/** Résultat d'une prise en charge renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatPriseEnCharge = ResultatAction<{ responsableId: string }>;
+
+function refusTraitement(code: CodeErreur, message = messageErreur(code)) {
+  return { ok: false as const, code, message };
+}
+
+/**
+ * Prise en charge d'une demande Nouvelle par le membre connecté
+ * (`prendre_en_charge`). Réussite ou refus « attendu » (déjà prise,
+ * introuvable, passage interdit, droit insuffisant) : le détail est
+ * rafraîchi pour montrer le vrai état (un membre désactivé est renvoyé à la
+ * connexion par la mise en page). Erreur inattendue : rien ne change à l'écran.
+ */
+export async function prendreEnCharge(demandeId: unknown): Promise<ResultatPriseEnCharge> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[prendreEnCharge] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "prendre_en_charge", {
+    p_demande_id: identifiant.data,
+  });
+
+  if (!resultat.ok) {
+    switch (resultat.code) {
+      case "DEJA_PRISE": {
+        const nom = resultat.detail?.responsable;
+        refresh();
+        return typeof nom === "string" && nom.trim() !== ""
+          ? refusTraitement("DEJA_PRISE", `Déjà prise en charge par ${nom.trim()}.`)
+          : refusTraitement("DEJA_PRISE");
+      }
+      case "DEMANDE_INTROUVABLE":
+      case "PASSAGE_INTERDIT":
+      case "DROIT_INSUFFISANT":
+        refresh();
+        return refusTraitement(resultat.code);
+      default:
+        // Jamais le détail technique vers le navigateur.
+        return refusTraitement(resultat.code);
+    }
+  }
+
+  const donnees = resultat.donnees as Record<string, unknown> | null;
+  if (typeof donnees?.responsable_id !== "string") {
+    console.error("[prendreEnCharge] réponse inattendue de prendre_en_charge");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: { responsableId: donnees.responsable_id } };
 }

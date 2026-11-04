@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { BoutonPrendreEnCharge } from "@/components/nova/actions-demande";
 import { BadgePriorite, BadgeStatut } from "@/components/nova/badges";
 import { Historique } from "@/components/nova/historique";
 import { BoutonReessayer } from "@/components/nova/reessayer";
@@ -10,10 +11,12 @@ import { adresseAvecPage, lireNumeroPage } from "@/lib/filtres";
 import { formaterDateHeure } from "@/lib/format";
 
 // Détail d'une demande (EXPERIENCE.md §9.5, maquette key-detail-demande.html,
-// story 1.6), en lecture seule : en-tête, description telle que saisie,
-// demandeur, bandeau si l'email de confirmation n'est pas parti, historique,
-// et colonne d'information (responsable, statut, priorité, catégorie).
-// Les actions et les notes internes arrivent à l'epic 2.
+// story 1.6) : en-tête, description telle que saisie, demandeur, bandeau si
+// l'email de confirmation n'est pas parti, historique, et panneau d'actions
+// à droite (en dessous sur téléphone) : responsable, statut, priorité,
+// catégorie. Story 2.1 : « Prendre en charge » si la demande est Nouvelle
+// et sans responsable.
+// Les autres actions et les notes internes arrivent avec l'epic 2.
 // Lu avec la session de la personne connectée (RLS), jamais mis en cache.
 export const dynamic = "force-dynamic";
 
@@ -184,7 +187,13 @@ function Detail({ demande }: { demande: DetailDemande }) {
           className="rounded-lg border border-border bg-surface p-4 md:p-5"
         >
           <dl>
-            <Info libelle="Responsable">{responsable}</Info>
+            <Info libelle="Responsable">
+              <span data-testid="responsable">{responsable}</span>
+              {/* Même condition que prendre_en_charge : Nouvelle et sans responsable. */}
+              {demande.statut === "nouvelle" && demande.responsableId === null ? (
+                <BoutonPrendreEnCharge demandeId={demande.id} />
+              ) : null}
+            </Info>
             <Info libelle="Statut">
               <BadgeStatut statut={demande.statut} />
             </Info>

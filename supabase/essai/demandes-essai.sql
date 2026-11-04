@@ -241,9 +241,8 @@ begin
       insert into public.historique
         (demande_id, auteur_type, auteur_id, type, ancienne_valeur, nouvelle_valeur, cree_le)
       values
-        (v_id, 'membre', v_admin, 'prise_en_charge', null, v_admin::text,
-         v_cree_le + interval '2 hours'),
-        (v_id, 'membre', v_admin, 'changement_statut', 'nouvelle', 'en_cours',
+        -- Une prise en charge = une seule ligne (story 2.1).
+        (v_id, 'membre', v_admin, 'prise_en_charge', 'nouvelle', 'en_cours',
          v_cree_le + interval '2 hours'),
         (v_id, 'membre', v_admin, 'changement_statut', 'en_cours', 'traitee',
          v_cree_le + interval '1 day'),

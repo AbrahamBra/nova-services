@@ -2,6 +2,7 @@ import type { LigneHistorique } from "@/lib/detail-demande";
 import {
   AUTEUR_DEMANDEUR,
   AUTEUR_INCONNU,
+  AVANT_AUTEUR_HISTORIQUE,
   CANAUX,
   LIBELLES_CANAL,
   LIBELLES_PRIORITE,
@@ -10,6 +11,7 @@ import {
   PHRASES_HISTORIQUE,
   PRIORITES,
   STATUTS,
+  TYPES_PASSAGE_OMIS_SI_INCONNU,
   type NatureValeurHistorique,
 } from "@/lib/domaine";
 import { formaterDateHeure } from "@/lib/format";
@@ -60,24 +62,46 @@ function traduire(
   }
 }
 
-/** Auteur et phrase d'une ligne, ex. « Demandeur (formulaire) » + « a créé la demande ». */
+function estStatut(valeur: string | null): boolean {
+  return valeur !== null && (STATUTS as readonly string[]).includes(valeur);
+}
+
+/**
+ * Auteur et phrase d'une ligne, ex. « Demandeur (formulaire) » + « a créé la
+ * demande ». `avant` : début de phrase placé avant l'auteur (« Prise en
+ * charge par »), vide pour la plupart des types.
+ */
 export function texteLigneHistorique(
   ligne: LigneHistorique,
   noms: Pick<Props, "nomsMembres" | "nomsCategories">,
-): { auteur: string; action: string } {
+): { avant: string; auteur: string; action: string } {
   const estDemandeur = ligne.auteurType === "demandeur";
   const auteur = estDemandeur
     ? AUTEUR_DEMANDEUR
     : ((ligne.auteurId && noms.nomsMembres[ligne.auteurId]) || AUTEUR_INCONNU);
   const nature = NATURE_VALEUR_HISTORIQUE[ligne.type];
-  const action = PHRASES_HISTORIQUE[ligne.type](
-    {
-      ancienne: traduire(ligne.ancienneValeur, nature, noms),
-      nouvelle: traduire(ligne.nouvelleValeur, nature, noms),
-    },
-    estDemandeur,
-  );
-  return { auteur, action };
+  let valeurs = {
+    ancienne: traduire(ligne.ancienneValeur, nature, noms),
+    nouvelle: traduire(ligne.nouvelleValeur, nature, noms),
+  };
+  // Ancien format (valeurs qui ne sont pas des statuts) : sans le passage.
+  if (
+    TYPES_PASSAGE_OMIS_SI_INCONNU.includes(ligne.type) &&
+    !(estStatut(ligne.ancienneValeur) && estStatut(ligne.nouvelleValeur))
+  ) {
+    valeurs = { ancienne: null, nouvelle: null };
+  }
+  const action = PHRASES_HISTORIQUE[ligne.type](valeurs, estDemandeur);
+  return { avant: AVANT_AUTEUR_HISTORIQUE[ligne.type] ?? "", auteur, action };
+}
+
+/** Phrase complète d'une ligne, telle qu'affichée. */
+export function phraseLigneHistorique(
+  ligne: LigneHistorique,
+  noms: Pick<Props, "nomsMembres" | "nomsCategories">,
+): string {
+  const { avant, auteur, action } = texteLigneHistorique(ligne, noms);
+  return `${avant}${auteur}${action ? ` ${action}` : ""}`;
 }
 
 function Illisibles({ nombre }: { nombre: number }) {
@@ -104,7 +128,10 @@ export function Historique({ lignes, lignesIllisibles = 0, nomsMembres, nomsCate
     <>
     <ol className="text-sm" data-testid="historique">
       {lignes.map((ligne) => {
-        const { auteur, action } = texteLigneHistorique(ligne, { nomsMembres, nomsCategories });
+        const { avant, auteur, action } = texteLigneHistorique(ligne, {
+          nomsMembres,
+          nomsCategories,
+        });
         return (
           <li
             key={ligne.id}
@@ -115,7 +142,9 @@ export function Historique({ lignes, lignesIllisibles = 0, nomsMembres, nomsCate
               {formaterDateHeure(ligne.creeLe)}
             </time>
             <span className="break-words">
-              <b className="font-semibold">{auteur}</b> {action}
+              {avant}
+              <b className="font-semibold">{auteur}</b>
+              {action ? ` ${action}` : null}
             </span>
           </li>
         );

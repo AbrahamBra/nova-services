@@ -19,6 +19,8 @@ import { Client } from "pg";
 // aucun droit (rien à ajouter).
 // Story 1.9 : tentatives_connexion, commencer_connexion, terminer_connexion
 // et les utilitaires prive de comptage, aucun droit (rien à ajouter).
+// Story 2.1 : prendre_en_charge pour le membre connecté (la fonction vérifie
+// elle-même qu'il est actif) ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -32,6 +34,7 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
+  "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
   "authenticated:table:public.demandes_liste:SELECT",
   ...COLONNES_DEMANDES.map((c) => `authenticated:colonne:public.demandes.${c}:SELECT`),
   ...["id", "nom", "etat"].map((c) => `authenticated:colonne:public.membres.${c}:SELECT`),
