@@ -8,6 +8,7 @@ import {
   supprimerComptesTest,
   type CompteTest,
 } from "../outils/comptes";
+import { utiliserIpDeTest } from "../outils/ip-test";
 
 // Story 1.4 — connexion à l'espace équipe (navigateur).
 // Nécessite la migration 20261103000005 appliquée sur nova-dev.
@@ -17,6 +18,12 @@ import {
 loadEnvConfig(process.cwd(), true, { info: () => {}, error: console.error });
 
 const comptes: CompteTest[] = [];
+
+// Story 1.9 : chaque test se connecte depuis sa propre IP de test, pour que
+// les échecs de connexion d'un test ne bloquent jamais les autres.
+test.beforeEach(async ({ context }) => {
+  await utiliserIpDeTest(context);
+});
 
 test.beforeAll(() => {
   // Ces tests écrivent dans la base : jamais ailleurs qu'en développement.

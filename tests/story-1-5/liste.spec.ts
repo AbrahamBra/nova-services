@@ -4,6 +4,7 @@ import { loadEnvConfig } from "@next/env";
 import { expect, test, type Page } from "@playwright/test";
 import { verifierEnvironnement } from "../garde-environnement";
 import { avecBase, creerCompteTest, supprimerComptesTest, type CompteTest } from "../outils/comptes";
+import { utiliserIpDeTest } from "../outils/ip-test";
 import {
   creerDemandeTest,
   creerDemandesRemplissage,
@@ -40,6 +41,12 @@ function urlDetailAttendue(reference: string, position: { numeroPage: number } |
 let compte: CompteTest;
 // Du plus ancien au plus récent.
 let demandes: DemandeTest[] = [];
+
+// Story 1.9 : chaque test se connecte depuis sa propre IP de test, pour que
+// les échecs de connexion d'un test ne bloquent jamais les autres.
+test.beforeEach(async ({ context }) => {
+  await utiliserIpDeTest(context);
+});
 
 test.beforeAll(async () => {
   verifierEnvironnement(process.env.SUPABASE_ENVIRONNEMENT);

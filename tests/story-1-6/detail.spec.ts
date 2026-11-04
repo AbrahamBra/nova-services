@@ -4,6 +4,7 @@ import { loadEnvConfig } from "@next/env";
 import { expect, test, type Page } from "@playwright/test";
 import { verifierEnvironnement } from "../garde-environnement";
 import { avecBase, creerCompteTest, supprimerComptesTest, type CompteTest } from "../outils/comptes";
+import { utiliserIpDeTest } from "../outils/ip-test";
 import {
   creerDemandeTest,
   creerDemandesRemplissage,
@@ -28,6 +29,12 @@ const DESCRIPTION = "Bonjour,\n<script>window.__piege = 1</script>\nMerci.";
 let compte: CompteTest;
 let complete: DemandeTest; // téléphone, société, email non envoyé (démonstration)
 let minimale: DemandeTest; // sans téléphone ni société, email en échec
+
+// Story 1.9 : chaque test se connecte depuis sa propre IP de test, pour que
+// les échecs de connexion d'un test ne bloquent jamais les autres.
+test.beforeEach(async ({ context }) => {
+  await utiliserIpDeTest(context);
+});
 
 test.beforeAll(async () => {
   verifierEnvironnement(process.env.SUPABASE_ENVIRONNEMENT);

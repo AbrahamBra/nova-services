@@ -57,7 +57,17 @@ function MessageErreur({ id, message }: { id: string; message?: string }) {
   );
 }
 
-export function FormulaireConnexion({ retour }: { retour: string }) {
+/** Texte du bandeau d'expiration (story 1.9, décision d'Abraham). */
+export const MESSAGE_SESSION_EXPIREE = "Votre session a expiré. Reconnectez-vous.";
+
+export function FormulaireConnexion({
+  retour,
+  sessionExpiree = false,
+}: {
+  retour: string;
+  /** Session fermée par proxy.ts après 8 h : bandeau d'information. */
+  sessionExpiree?: boolean;
+}) {
   const id = useId();
   const formulaireRef = useRef<HTMLFormElement>(null);
   const bandeauRef = useRef<HTMLDivElement>(null);
@@ -138,6 +148,15 @@ export function FormulaireConnexion({ retour }: { retour: string }) {
       }}
     >
       <input type="hidden" name="retour" value={retour} />
+
+      {sessionExpiree && !erreurGenerale ? (
+        <div
+          role="status"
+          className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3"
+        >
+          <p className="font-medium text-primary">{MESSAGE_SESSION_EXPIREE}</p>
+        </div>
+      ) : null}
 
       {erreurGenerale ? (
         <div

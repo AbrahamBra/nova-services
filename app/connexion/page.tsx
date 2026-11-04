@@ -3,12 +3,14 @@ import Link from "next/link";
 import { FormulaireConnexion } from "@/components/formulaire-connexion";
 import { redirect } from "next/navigation";
 import { adresseDeRetour } from "@/lib/schemas/connexion";
+import { PARAMETRE_EXPIREE } from "@/lib/supabase/proxy";
 import { lireProfil } from "@/lib/session";
 
 // Page « Connexion » (EXPERIENCE.md §9.12) : colonne centrée, logo, un
 // formulaire court. Pas d'inscription libre ni de mot de passe oublié
 // (epic 4). L'adresse de retour n'est suivie que si elle commence par
-// `/equipe` (AD-28).
+// `/equipe` (AD-28). Story 1.9 : `?expiree=1` (posé par proxy.ts après
+// 8 h de session) affiche « Votre session a expiré. Reconnectez-vous. ».
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -17,8 +19,9 @@ export const metadata: Metadata = {
 };
 
 export default async function PageConnexion({ searchParams }: PageProps<"/connexion">) {
-  const { retour } = await searchParams;
-  const adresse = adresseDeRetour(retour);
+  const parametres = await searchParams;
+  const adresse = adresseDeRetour(parametres.retour);
+  const expiree = parametres[PARAMETRE_EXPIREE] === "1";
 
   // Membre actif déjà connecté : directement vers la page demandée. Une
   // session sans membre actif reste sur le formulaire (pas de boucle).
@@ -39,7 +42,7 @@ export default async function PageConnexion({ searchParams }: PageProps<"/connex
       <h1 className="mt-6 text-2xl font-semibold leading-[1.3]">Connexion</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">Espace réservé à l&apos;équipe.</p>
 
-      <FormulaireConnexion retour={adresse} />
+      <FormulaireConnexion retour={adresse} sessionExpiree={expiree} />
     </main>
   );
 }
