@@ -9,10 +9,22 @@ import { Client } from "pg";
 // « role:type:schema.objet:droit ». Vide à la story 1.1.
 // Story 1.4 : mon_profil() pour le membre connecté ; les fonctions de droits
 // de prive pour les règles RLS (sans accès au schéma prive lui-même).
+// Story 1.5 : lecture de la vue demandes_liste et droits PAR COLONNE
+// (« role:colonne:schema.table.colonne:droit ») : jamais jeton_confirmation
+// ni cle_envoi ; sur membres, ni email ni rôle.
+const COLONNES_DEMANDES = [
+  "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
+  "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
+  "consentement_le", "etat_email", "cree_le", "traitee_le", "mis_a_jour_le",
+];
 const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
+  "authenticated:table:public.demandes_liste:SELECT",
+  ...COLONNES_DEMANDES.map((c) => `authenticated:colonne:public.demandes.${c}:SELECT`),
+  ...["id", "nom", "etat"].map((c) => `authenticated:colonne:public.membres.${c}:SELECT`),
+  ...["id", "nom", "actif"].map((c) => `authenticated:colonne:public.categories.${c}:SELECT`),
 ].sort();
 
 const ROLES = ["anon", "authenticated"];
@@ -47,6 +59,18 @@ async function droitsAccordes(): Promise<string[]> {
     where n.nspname in ('public', 'prive')
       and c.relkind in ('r', 'v', 'm', 'f', 'p')
       and has_table_privilege(r.rolname, c.oid, p.priv)
+    union all
+    -- Colonnes (droits accordés colonne par colonne, sans droit sur la table)
+    select r.rolname || ':colonne:' || n.nspname || '.' || c.relname || '.' || a.attname || ':' || p.priv
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+    cross join roles r
+    cross join unnest(array['SELECT','INSERT','UPDATE','REFERENCES']) p(priv)
+    where n.nspname in ('public', 'prive')
+      and c.relkind in ('r', 'v', 'm', 'f', 'p')
+      and has_column_privilege(r.rolname, c.oid, a.attnum, p.priv)
+      and not has_table_privilege(r.rolname, c.oid, p.priv)
     union all
     -- Séquences
     select r.rolname || ':sequence:' || n.nspname || '.' || c.relname || ':' || p.priv

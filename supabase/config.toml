@@ -65,8 +65,10 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Désactivé : les données d'essai (supabase/essai/demandes-essai.sql) ne se
+# chargent que par `npm run donnees:remplir`, qui refuse tout autre projet que
+# celui de développement. Un `supabase db reset` ne doit jamais les charger.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]

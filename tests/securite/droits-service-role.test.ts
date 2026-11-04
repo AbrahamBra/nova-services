@@ -5,7 +5,16 @@ import { Client } from "pg";
 // droit direct sur les tables métier, qui ne changent que par les fonctions
 // SQL en SECURITY DEFINER (AD-4, AD-5, AD-6 ; migrations 20261103000004 et 0005).
 
-const TABLES = ["demandes", "historique", "compteurs_reference", "categories", "parametres", "membres"];
+const TABLES = [
+  "demandes",
+  "historique",
+  "compteurs_reference",
+  "categories",
+  "parametres",
+  "membres",
+  // Story 1.5 : vue de la liste, lue seulement avec la session d'un membre.
+  "demandes_liste",
+];
 const DROITS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
 
 let client: Client;
@@ -30,6 +39,21 @@ describe("sécurité — droits de service_role sur les tables", () => {
        where has_table_privilege('service_role', 'public.' || t.nom, d.droit)
        order by 1`,
       [TABLES, DROITS],
+    );
+    expect(rows.map((ligne) => ligne.droit)).toEqual([]);
+  });
+
+  it("aucun droit par colonne sur les tables métier ni sur la vue", async () => {
+    const { rows } = await client.query<{ droit: string }>(
+      `select c.relname || '.' || a.attname || ':' || d.droit as droit
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+       join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+       cross join unnest(array['SELECT','INSERT','UPDATE','REFERENCES']) as d(droit)
+       where c.relname = any($1::text[])
+         and has_column_privilege('service_role', c.oid, a.attnum, d.droit)
+       order by 1`,
+      [TABLES],
     );
     expect(rows.map((ligne) => ligne.droit)).toEqual([]);
   });

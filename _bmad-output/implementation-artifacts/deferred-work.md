@@ -4,7 +4,7 @@
   summary: Envelopper le bouton shadcn aux règles de DESIGN.md (coins 6 px, survol `--primary-hover`, couleurs secondaires).
   evidence: Le bouton généré utilise `rounded-lg` (8 px) et `hover:bg-primary/80` ; à traiter en story 1.2, premier bouton à l'écran.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-1-installer-le-socle.md`
-  summary: Étendre `tests/securite/droits-anon.test.ts` aux droits par colonne.
+  summary: (TRAITÉ en story 1.5) Étendre `tests/securite/droits-anon.test.ts` aux droits par colonne.
   evidence: La story 1.5 accorde des droits par colonne sur `membres` ; le test actuel ne les voit pas.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-1-installer-le-socle.md`
   summary: Vérifier que le garde-fou d'environnement est bien branché dans Vitest et l'ajouter à Playwright.
@@ -27,3 +27,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-me-connecter-espace-equipe.md`
   summary: Menu mobile : bloquer le défilement et rendre la page inerte quand le panneau est ouvert ; rubrique active par préfixe.
   evidence: Accessibilité du panneau incomplète ; sous-pages de l'administration à venir (epic 4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-voir-toutes-les-demandes.md`
+  summary: Test automatique et isolé de `donnees:remplir` (40 lignes, relance sans doublon, historique).
+  evidence: Vérifié à la main seulement ; un test sur la base partagée gênerait les autres tests.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-voir-toutes-les-demandes.md`
+  summary: Liste : la colonne Responsable déborde à 1 440 px (défilement horizontal) ; resserrer les colonnes.
+  evidence: Constaté sur capture à 1 440 px de large avec le menu ouvert.

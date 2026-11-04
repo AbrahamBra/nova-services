@@ -14,7 +14,9 @@
     "db:push": "node scripts/db-push.mjs",
     "secrets:github": "node scripts/secrets-github.mjs",
     "admin:creer": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/premier-admin.ts",
-    "comptes:test": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/comptes-de-test.ts"
+    "comptes:test": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/comptes-de-test.ts",
+    "donnees:remplir": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/donnees.ts remplir",
+    "donnees:vider": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/donnees.ts vider"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

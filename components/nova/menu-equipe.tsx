@@ -14,7 +14,10 @@ import { cn } from "@/lib/utils";
 
 type Rubrique = { libelle: string; adresse: string };
 
-const RUBRIQUES: Rubrique[] = [{ libelle: "Accueil", adresse: "/equipe" }];
+const RUBRIQUES: Rubrique[] = [
+  { libelle: "Accueil", adresse: "/equipe" },
+  { libelle: "Demandes", adresse: "/equipe/demandes" },
+];
 const RUBRIQUES_ADMIN: Rubrique[] = [{ libelle: "Vue d'ensemble", adresse: "/equipe/admin" }];
 
 type Props = {
@@ -25,6 +28,11 @@ type Props = {
 
 const CLASSE_LIEN =
   "flex min-h-11 items-center rounded-md px-3 text-[15px] font-medium text-sidebar-foreground/85 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-white/70 aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-foreground";
+
+/** Rubrique active : sa page ou une de ses sous-pages (sauf l'accueil, exact). */
+function estActive(chemin: string, adresse: string): boolean {
+  return chemin === adresse || (adresse !== "/equipe" && chemin.startsWith(`${adresse}/`));
+}
 
 function Lien({ rubrique, actif }: { rubrique: Rubrique; actif: boolean }) {
   return (
@@ -119,7 +127,7 @@ export function MenuEquipe({ nom, libelleRole, estAdmin }: Props) {
         <div className="flex-1 px-3 py-3 lg:py-0">
           <ul className="space-y-1">
             {RUBRIQUES.map((rubrique) => (
-              <Lien key={rubrique.adresse} rubrique={rubrique} actif={chemin === rubrique.adresse} />
+              <Lien key={rubrique.adresse} rubrique={rubrique} actif={estActive(chemin, rubrique.adresse)} />
             ))}
           </ul>
 
@@ -133,7 +141,7 @@ export function MenuEquipe({ nom, libelleRole, estAdmin }: Props) {
                   <Lien
                     key={rubrique.adresse}
                     rubrique={rubrique}
-                    actif={chemin === rubrique.adresse}
+                    actif={estActive(chemin, rubrique.adresse)}
                   />
                 ))}
               </ul>
