@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { Client, type DatabaseError } from "pg";
+import { empreinteDeTest } from "../outils/ip-test";
 import { ETATS_EMAIL_RESULTAT, TYPES_JOURNAL } from "@/lib/domaine";
 
 // Story 1.7 — `noter_resultat_email`, table `journal`, `prive.ecrire_journal`
@@ -57,8 +58,9 @@ type ReponseDepot = {
 async function deposer(cle = crypto.randomUUID()): Promise<ReponseDepot> {
   const { rows } = await base.query(
     `select public.deposer_demande($1, $2, $3, '06 12 34 56 78', 'Atelier Garnier', $4,
-                                   'Impression impossible', 'Description secrète.', true) as r`,
-    [cle, `${PREFIXE} Sophie Garnier`, EMAIL_DEMANDEUR, categorieActive],
+                                   'Impression impossible', 'Description secrète.', true,
+                                   $5) as r`,
+    [cle, `${PREFIXE} Sophie Garnier`, EMAIL_DEMANDEUR, categorieActive, empreinteDeTest()],
   );
   return rows[0].r;
 }

@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
 import { verifierEnvironnement } from "../garde-environnement";
 import { creerCompteTest, supprimerComptesTest, type CompteTest } from "../outils/comptes";
+import { utiliserIpDeTest } from "../outils/ip-test";
 
 // Story 1.7 — phrase « Un email de confirmation vous a été envoyé. » sur la
 // page de confirmation (navigateur). Nécessite la migration 20261103000009.
@@ -15,6 +16,12 @@ import { creerCompteTest, supprimerComptesTest, type CompteTest } from "../outil
 // et sont effacées à la fin.
 
 loadEnvConfig(process.cwd(), true, { info: () => {}, error: console.error });
+
+// Story 1.8 : chaque test dépose avec sa propre IP (limite de 5 envois en
+// 10 minutes par IP).
+test.beforeEach(async ({ context }) => {
+  await utiliserIpDeTest(context);
+});
 
 const EMAIL_TEST = "sophie.garnier@example.com";
 const PHRASE = "Un email de confirmation vous a été envoyé.";

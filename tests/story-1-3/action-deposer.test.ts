@@ -16,6 +16,9 @@ vi.mock("@/lib/server/supabase-service", () => ({
   },
 }));
 
+// En-têtes de la requête (story 1.8 : IP du visiteur) : aucun, donc 127.0.0.1.
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+
 vi.mock("next/navigation", () => ({
   RedirectType: { push: "push", replace: "replace" },
   redirect: (adresse: string, type?: string) => {

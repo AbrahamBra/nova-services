@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Client, type DatabaseError } from "pg";
+import { empreinteDeTest } from "../outils/ip-test";
 import {
   clientConnecte,
   clientPubliableTest,
@@ -369,8 +370,8 @@ describe("table membres — contraintes", () => {
       const { rows } = await base.query<{ r: { reference: string } }>(
         `select public.deposer_demande($1, 'TEST-1.4 Sophie Garnier', 'sophie.garnier@example.com',
                 null, null, (select id from public.categories where actif order by ordre limit 1),
-                'Objet', 'Description', true) as r`,
-        [randomUUID()],
+                'Objet', 'Description', true, $2) as r`,
+        [randomUUID(), empreinteDeTest()],
       );
       return erreurDe(
         base.query("update public.demandes set responsable_id = $1 where reference = $2", [

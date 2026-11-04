@@ -1,6 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3000;
+// Port dédié aux tests, distinct de l'aperçu (3000) : un serveur lancé à la
+// main sans IP_DE_TEST_AUTORISEE n'est jamais réutilisé par erreur (tous les
+// tests partageraient alors 127.0.0.1 et la limite d'envois, story 1.8).
+const PORT = 3210;
 const enCI = !!process.env.CI;
 
 export default defineConfig({
@@ -30,5 +33,10 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !enCI,
     timeout: 180_000,
+    // Story 1.8 : l'en-tête x-nova-ip-test remplace l'IP, pour que chaque
+    // test dépose avec sa propre adresse sans atteindre la limite d'envois
+    // (tests/outils/ip-test.ts). Seulement pour le serveur lancé ici, sur le
+    // port dédié aux tests.
+    env: { IP_DE_TEST_AUTORISEE: "1" },
   },
 });

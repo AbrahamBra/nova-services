@@ -15,6 +15,8 @@ import { Client } from "pg";
 // Story 1.6 : lecture de l'historique, colonne par colonne (codes et
 // identifiants seulement).
 // Story 1.7 : journal et noter_resultat_email, aucun droit (rien à ajouter).
+// Story 1.8 : envois_formulaire et nouvelle signature de deposer_demande,
+// aucun droit (rien à ajouter).
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",

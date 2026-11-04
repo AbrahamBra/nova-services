@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Client } from "pg";
 import type { Priorite, Statut } from "@/lib/domaine";
+import { empreinteDeTest } from "./ip-test";
 
 // Demandes jetables pour les tests de la liste (story 1.5). Créées par
 // `deposer_demande` (vraie référence, compteur de l'année), puis ajustées
@@ -48,8 +49,17 @@ export async function creerDemandeTest(
   const objet = options.objet ?? `Demande de test ${randomUUID().slice(0, 6)}`;
   const societe = options.societe === undefined ? "Atelier Garnier" : options.societe;
   const { rows } = await base.query<{ r: { reference: string } }>(
-    "select public.deposer_demande($1, $2, $3, null, $4, $5, $6, $7, true) as r",
-    [randomUUID(), nom, "sophie.garnier@example.com", societe, categorie.id, objet, "Description."],
+    "select public.deposer_demande($1, $2, $3, null, $4, $5, $6, $7, true, $8) as r",
+    [
+      randomUUID(),
+      nom,
+      "sophie.garnier@example.com",
+      societe,
+      categorie.id,
+      objet,
+      "Description.",
+      empreinteDeTest(),
+    ],
   );
   const reference = rows[0].r.reference;
   const { rows: mises } = await base.query<{ id: string }>(
@@ -95,8 +105,11 @@ export async function creerDemandesRemplissage(
 ): Promise<void> {
   const categorie = await premiereCategorie(base);
   const { rows } = await base.query<{ reference: string }>(
+    // Une empreinte d'IP aléatoire par demande : jamais la limite d'envois (story 1.8).
     `select public.deposer_demande(gen_random_uuid(), $1, 'remplissage@example.com', null,
-                                   null, $2, 'Demande de remplissage', 'Description.', true)
+                                   null, $2, 'Demande de remplissage', 'Description.', true,
+                                   replace(gen_random_uuid()::text, '-', '')
+                                     || replace(gen_random_uuid()::text, '-', ''))
             ->> 'reference' as reference
        from generate_series(1, $3::int)`,
     [`${prefixe} Remplissage`, categorie.id, nombre],
