@@ -31,5 +31,5 @@
   summary: Test automatique et isolé de `donnees:remplir` (40 lignes, relance sans doublon, historique).
   evidence: Vérifié à la main seulement ; un test sur la base partagée gênerait les autres tests.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-voir-toutes-les-demandes.md`
-  summary: Liste : la colonne Responsable déborde à 1 440 px (défilement horizontal) ; resserrer les colonnes.
+  summary: (TRAITÉ en story 1.6) Liste : la colonne Responsable déborde à 1 440 px (défilement horizontal) ; resserrer les colonnes.
   evidence: Constaté sur capture à 1 440 px de large avec le menu ouvert.

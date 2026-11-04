@@ -77,7 +77,7 @@ export default async function PageDemandes({ searchParams }: PageProps<"/equipe/
   return (
     <>
       <Entete total={total} />
-      <ListeDemandes lignes={lignes} />
+      <ListeDemandes lignes={lignes} parametres={parametres} page={page} />
       <Pagination
         chemin={CHEMIN}
         parametres={parametres}

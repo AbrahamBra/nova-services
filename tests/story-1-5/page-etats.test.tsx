@@ -117,7 +117,8 @@ describe("page /equipe/demandes — états", () => {
     expect(html).toContain("—");
     expect(html).toContain("Téléphone");
     expect(html).toContain("03/11/2026 à 09:12");
-    expect(html).toContain('href="/equipe/demandes/NOVA-2026-0042"');
+    // Story 1.6 : la page de la liste est transmise au détail (retour).
+    expect(html).toContain('href="/equipe/demandes/NOVA-2026-0042?page=2"');
     expect(html).toContain("26–40 sur 40");
     expect(html).toContain('href="/equipe/demandes"');
     expect(html).toMatch(/role="link" aria-disabled="true"[^>]*>Suivant</);

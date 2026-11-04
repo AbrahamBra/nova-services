@@ -12,10 +12,16 @@ import { Client } from "pg";
 // Story 1.5 : lecture de la vue demandes_liste et droits PAR COLONNE
 // (« role:colonne:schema.table.colonne:droit ») : jamais jeton_confirmation
 // ni cle_envoi ; sur membres, ni email ni rôle.
+// Story 1.6 : lecture de l'historique, colonne par colonne (codes et
+// identifiants seulement).
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
   "consentement_le", "etat_email", "cree_le", "traitee_le", "mis_a_jour_le",
+];
+const COLONNES_HISTORIQUE = [
+  "id", "demande_id", "auteur_type", "auteur_id", "type", "ancienne_valeur", "nouvelle_valeur",
+  "cree_le",
 ];
 const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
@@ -25,6 +31,7 @@ const DROITS_ATTENDUS: string[] = [
   ...COLONNES_DEMANDES.map((c) => `authenticated:colonne:public.demandes.${c}:SELECT`),
   ...["id", "nom", "etat"].map((c) => `authenticated:colonne:public.membres.${c}:SELECT`),
   ...["id", "nom", "actif"].map((c) => `authenticated:colonne:public.categories.${c}:SELECT`),
+  ...COLONNES_HISTORIQUE.map((c) => `authenticated:colonne:public.historique.${c}:SELECT`),
 ].sort();
 
 const ROLES = ["anon", "authenticated"];

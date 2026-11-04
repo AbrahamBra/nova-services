@@ -25,6 +25,17 @@ const APRES_CONNEXION = { timeout: 15_000 };
 // Navigations : le serveur de développement est partagé par 3 processus.
 const NAVIGATION = { timeout: 15_000 };
 const NOMBRE = String.raw`\d[\d ]*`;
+// Story 1.6 : le lien du détail transmet la page de la liste — aucun
+// paramètre en page 1, `?page=N` au-delà.
+function adresseDetailAttendue(reference: string, position: { numeroPage: number } | undefined): string {
+  const numero = position!.numeroPage;
+  return numero === 1 ? `/equipe/demandes/${reference}` : `/equipe/demandes/${reference}?page=${numero}`;
+}
+
+/** Adresse complète attendue, en expression régulière exacte (fin de l'URL). */
+function urlDetailAttendue(reference: string, position: { numeroPage: number } | undefined): RegExp {
+  return new RegExp(`${adresseDetailAttendue(reference, position).replace("?", String.raw`\?`)}$`);
+}
 
 let compte: CompteTest;
 // Du plus ancien au plus récent.
@@ -176,7 +187,8 @@ test.describe("liste des demandes", () => {
     const l1 = ligne(page, enCours);
     await expect(l1.getByRole("link", { name: enCours.reference })).toHaveAttribute(
       "href",
-      `/equipe/demandes/${enCours.reference}`,
+      // Story 1.6 : la page de la liste est transmise au détail (`?page=2`).
+      adresseDetailAttendue(enCours.reference, positions.get(enCours.reference)),
     );
     await expect(l1).toContainText(enCours.nom);
     await expect(l1).toContainText("Atelier Garnier");
@@ -198,9 +210,9 @@ test.describe("liste des demandes", () => {
 
     await sansViolationAxe(page);
 
-    // Toute la ligne ouvre le détail (story 1.6 : la page peut être introuvable d'ici là).
+    // Toute la ligne ouvre le détail.
     await ligne(page, nouvelle).click();
-    await expect(page).toHaveURL(new RegExp(`/equipe/demandes/${nouvelle.reference}$`), NAVIGATION);
+    await expect(page).toHaveURL(urlDetailAttendue(nouvelle.reference, positions.get(nouvelle.reference)), NAVIGATION);
   });
 
   test("pagination : « 1–25 sur N », Suivant mène à ?page=2, Précédent revient", async ({ page }) => {
@@ -276,7 +288,7 @@ test.describe("liste des demandes", () => {
       // Toute la carte ouvre le détail.
       await allerA(page, positions.get(nouvelle.reference));
       await carte(page, nouvelle).click();
-      await expect(page).toHaveURL(new RegExp(`/equipe/demandes/${nouvelle.reference}$`), NAVIGATION);
+      await expect(page).toHaveURL(urlDetailAttendue(nouvelle.reference, positions.get(nouvelle.reference)), NAVIGATION);
       return;
     }
 

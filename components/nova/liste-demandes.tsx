@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BadgePriorite, BadgeStatut } from "@/components/nova/badges";
 import type { LigneDemande } from "@/lib/demandes";
 import { LIBELLES_CANAL } from "@/lib/domaine";
+import { adresseAvecPage, type ParametresAdresse } from "@/lib/filtres";
 import { formaterDateHeure } from "@/lib/format";
 
 // Tableau des demandes (EXPERIENCE.md §4, §8, §9.4 ; UX-DR8) :
@@ -11,9 +12,20 @@ import { formaterDateHeure } from "@/lib/format";
 //   - téléphone (< 640 px) : une carte par demande.
 // Toute la ligne (ou la carte) ouvre le détail : la référence est un vrai
 // lien, étendu à toute la ligne par un pseudo-élément.
+// À 1 440 px avec le menu ouvert, les 9 colonnes tiennent sans défilement
+// horizontal (story 1.6) : largeurs minimales resserrées, et le nom du
+// responsable peut se couper.
 
-export function adresseDetail(reference: string): string {
-  return `/equipe/demandes/${encodeURIComponent(reference)}`;
+/**
+ * Adresse du détail. Le numéro de page (et, plus tard, les filtres) de la
+ * liste est transmis, pour que « ← Retour aux demandes » y ramène.
+ */
+export function adresseDetail(
+  reference: string,
+  parametres: ParametresAdresse = {},
+  page: number = 1,
+): string {
+  return adresseAvecPage(`/equipe/demandes/${encodeURIComponent(reference)}`, parametres, page);
 }
 
 // Lien de la référence, étendu à toute la ligne (ou carte) parente, qui doit
@@ -33,7 +45,15 @@ function Vide() {
   return <span className="text-muted-foreground">—</span>;
 }
 
-export function ListeDemandes({ lignes }: { lignes: LigneDemande[] }) {
+type Props = {
+  lignes: LigneDemande[];
+  /** Paramètres de l'adresse de la liste, transmis au détail. */
+  parametres?: ParametresAdresse;
+  /** Page affichée, transmise au détail. */
+  page?: number;
+};
+
+export function ListeDemandes({ lignes, parametres = {}, page = 1 }: Props) {
   return (
     <>
       {/* Tablette et ordinateur. */}
@@ -61,7 +81,7 @@ export function ListeDemandes({ lignes }: { lignes: LigneDemande[] }) {
               >
                 <td className={CLASSE_CELLULE}>
                   <Link
-                    href={adresseDetail(ligne.reference)}
+                    href={adresseDetail(ligne.reference, parametres, page)}
                     prefetch={false}
                     className={CLASSE_LIEN_REFERENCE}
                   >
@@ -71,7 +91,7 @@ export function ListeDemandes({ lignes }: { lignes: LigneDemande[] }) {
                 <td className={`${CLASSE_CELLULE} whitespace-nowrap text-foreground/80`}>
                   {formaterDateHeure(ligne.creeLe)}
                 </td>
-                <td className={`${CLASSE_CELLULE} ${ORDINATEUR} min-w-40`}>
+                <td className={`${CLASSE_CELLULE} ${ORDINATEUR} min-w-36`}>
                   <span className="block font-medium break-words">{ligne.nom}</span>
                   {ligne.societe ? (
                     <span className="block text-[13px] break-words text-muted-foreground">
@@ -79,7 +99,7 @@ export function ListeDemandes({ lignes }: { lignes: LigneDemande[] }) {
                     </span>
                   ) : null}
                 </td>
-                <td className={`${CLASSE_CELLULE} min-w-48 break-words`}>{ligne.objet}</td>
+                <td className={`${CLASSE_CELLULE} min-w-40 break-words`}>{ligne.objet}</td>
                 <td className={`${CLASSE_CELLULE} ${ORDINATEUR}`}>{ligne.categorie}</td>
                 <td className={`${CLASSE_CELLULE} ${ORDINATEUR} whitespace-nowrap`}>
                   {LIBELLES_CANAL[ligne.canal]}
@@ -90,7 +110,7 @@ export function ListeDemandes({ lignes }: { lignes: LigneDemande[] }) {
                 <td className={CLASSE_CELLULE}>
                   <BadgePriorite priorite={ligne.priorite} />
                 </td>
-                <td className={`${CLASSE_CELLULE} ${ORDINATEUR}`}>
+                <td className={`${CLASSE_CELLULE} ${ORDINATEUR} min-w-24 wrap-anywhere`}>
                   {ligne.responsable ?? <Vide />}
                 </td>
               </tr>
@@ -109,7 +129,7 @@ export function ListeDemandes({ lignes }: { lignes: LigneDemande[] }) {
           >
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <Link
-                href={adresseDetail(ligne.reference)}
+                href={adresseDetail(ligne.reference, parametres, page)}
                 prefetch={false}
                 className={CLASSE_LIEN_REFERENCE}
               >

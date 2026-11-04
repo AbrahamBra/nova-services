@@ -101,3 +101,62 @@ export const LIBELLES_TYPE_JOURNAL: Record<TypeJournal, string> = {
   email: "Email",
   connexion: "Connexion",
 };
+
+// Phrases de l'historique (AD-19, UX-DR11), affichées par le composant unique
+// `components/nova/historique.tsx` : « <auteur> <phrase> ».
+// Les valeurs stockées sont des codes ou des identifiants ; le composant les
+// traduit en libellés (ou en noms) selon leur nature, puis les passe ici.
+
+/** Auteur d'une ligne écrite par le demandeur (dépôt par le formulaire). */
+export const AUTEUR_DEMANDEUR = "Demandeur (formulaire)";
+
+/** Auteur membre dont le nom n'est pas lisible (compte supprimé, par exemple). */
+export const AUTEUR_INCONNU = "Membre de l'équipe";
+
+/** Nature des valeurs ancienne et nouvelle de chaque type, pour leur traduction. */
+export type NatureValeurHistorique = "canal" | "membre" | "statut" | "priorite" | "categorie" | null;
+
+export const NATURE_VALEUR_HISTORIQUE: Record<TypeHistorique, NatureValeurHistorique> = {
+  creation: "canal",
+  prise_en_charge: "membre",
+  attribution: "membre",
+  liberation: "membre",
+  changement_statut: "statut",
+  classement_sans_suite: "statut",
+  changement_priorite: "priorite",
+  changement_categorie: "categorie",
+  note_ajoutee: null,
+  retour_nouvelle: "statut",
+};
+
+/** Valeurs d'une ligne déjà traduites en libellés (ou `null` si absentes). */
+export type ValeursHistorique = { ancienne: string | null; nouvelle: string | null };
+
+function passage({ ancienne, nouvelle }: ValeursHistorique): string {
+  if (ancienne && nouvelle) return ` : ${ancienne} → ${nouvelle}`;
+  if (nouvelle) return ` : ${nouvelle}`;
+  return "";
+}
+
+export const PHRASES_HISTORIQUE: Record<
+  TypeHistorique,
+  (valeurs: ValeursHistorique, auteurEstDemandeur: boolean) => string
+> = {
+  creation: ({ nouvelle }, auteurEstDemandeur) => {
+    if (auteurEstDemandeur) return "a créé la demande";
+    // Saisie interne ; canal absent ou inconnu : sans parenthèse.
+    return nouvelle
+      ? `a saisi la demande (${nouvelle.toLocaleLowerCase("fr-FR")})`
+      : "a saisi la demande";
+  },
+  prise_en_charge: () => "a pris en charge la demande",
+  attribution: ({ nouvelle }) =>
+    nouvelle ? `a attribué la demande à ${nouvelle}` : "a attribué la demande",
+  liberation: () => "a libéré la demande",
+  changement_statut: (valeurs) => `a changé le statut${passage(valeurs)}`,
+  classement_sans_suite: () => "a classé la demande sans suite",
+  changement_priorite: (valeurs) => `a changé la priorité${passage(valeurs)}`,
+  changement_categorie: (valeurs) => `a changé la catégorie${passage(valeurs)}`,
+  note_ajoutee: () => "a ajouté une note interne",
+  retour_nouvelle: () => "a remis la demande en Nouvelle",
+};

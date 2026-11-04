@@ -68,6 +68,22 @@ export async function creerDemandeTest(
       options.responsableId ?? null,
     ],
   );
+  // La ligne `creation` de l'historique suit la date de création décalée
+  // (sinon l'historique commencerait avant la demande). L'historique refuse
+  // toute modification : la ligne est remplacée (même contenu, autre date).
+  if (options.decalage) {
+    await base.query(
+      `with ancienne as (
+         delete from public.historique where demande_id = $1 and type = 'creation' returning *
+       )
+       insert into public.historique
+         (demande_id, auteur_type, auteur_id, type, ancienne_valeur, nouvelle_valeur, cree_le)
+       select demande_id, auteur_type, auteur_id, type, ancienne_valeur, nouvelle_valeur,
+              now() + $2::interval
+         from ancienne`,
+      [mises[0].id, options.decalage],
+    );
+  }
   return { id: mises[0].id, reference, nom, objet, societe };
 }
 
