@@ -18,6 +18,11 @@ export const MESSAGES_ERREUR = {
   // Story 1.4 — création d'un membre (creer_membre).
   MEMBRE_EXISTANT: "Ce compte est déjà membre de l'équipe.",
   EMAIL_DEJA_UTILISE: "Cette adresse email est déjà utilisée par un autre membre.",
+  // Story 1.7 — résultat de l'email de confirmation (noter_resultat_email).
+  // Jamais affichés au demandeur : un échec de notation ne change pas la
+  // confirmation (AD-13).
+  EMAIL_DEJA_NOTE: "Le résultat de l'email de confirmation est déjà noté.",
+  DEMANDE_INTROUVABLE: "Demande introuvable. Elle a peut-être été effacée.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
