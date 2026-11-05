@@ -39,6 +39,8 @@ export const MESSAGES_ERREUR = {
   // quand la base donne le nom du responsable (détail de l'erreur).
   DEJA_PRISE: "Déjà prise en charge par un autre membre de l'équipe.",
   PASSAGE_INTERDIT: "Ce changement de statut n'est pas autorisé.",
+  // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
+  ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
@@ -48,6 +50,7 @@ export const CODES_APPLICATION: readonly CodeErreur[] = [
   "ERREUR_INATTENDUE",
   "CONNEXION_REFUSEE",
   "ENVOI_IMPOSSIBLE",
+  "ACCES_REFUSE",
 ];
 
 export const CODES_ERREUR = Object.keys(MESSAGES_ERREUR) as CodeErreur[];

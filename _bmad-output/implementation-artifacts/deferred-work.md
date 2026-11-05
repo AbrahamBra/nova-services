@@ -60,3 +60,25 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-2-ajouter-une-note.md`
   summary: Le refus du serveur dans le formulaire de note (et le bouton de prise en charge) n'est pas testé à l'écran.
   evidence: aucun test ne fait renvoyer `ok: false` à l'action depuis un composant client ; il faudrait un montage de test de composant (Testing Library) ou un refus forcé en e2e.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Documenter que GitHub suspend les tâches planifiées après 60 jours sans activité (sauvegarde et réveil), avec un rappel de surveillance.
+  evidence: Limite de l'offre gratuite (epic-3-context) ; à écrire dans la fiche de maintenance, story 3.6.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Épingler les actions GitHub par empreinte de commit dans toutes les tâches qui voient des secrets.
+  evidence: `tests.yml`, `sauvegarde-nocturne.yml` et `reveil.yml` utilisent des étiquettes mobiles (`@v4`, `@v1`).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Sortir la garde d'adresse et le choix de l'environnement de la sauvegarde dans un script exécuté par un test (5 cas).
+  evidence: Le test actuel ne lit que le texte du fichier ; un `||` changé en `&&` passerait. À faire avec l'ajout de `purger_technique`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
+  summary: Vérifier que `donnees.sql` contient bien les comptes (`auth.users`) — non vérifié.
+  evidence: Si absents, les membres restaurés n'auraient pas de compte ; à prouver pendant la restauration réelle (story 3.4).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
+  summary: Vérifier en production (Netlify) que les erreurs arrivent dans Sentry sans perte (flush des fonctions) et en un seul exemplaire.
+  evidence: Non vérifiable en développement ; critère « moins de 5 minutes » à refaire en story 3.1.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
+  summary: Au build Netlify, nommer la version Sentry comme `NEXT_PUBLIC_APP_VERSION`, supprimer les cartes du code source après envoi, et n'envoyer que si org et projet sont remplis.
+  evidence: `withSentryConfig` n'est actif qu'avec `SENTRY_AUTH_TOKEN` sur Netlify (story 3.1).
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
+  summary: Envoyer aussi à Sentry les erreurs imprévues qui ne passent pas par `appeler()` (`lib/session.ts`, `lib/demandes.ts`, `lib/detail-demande.ts`, `lib/actions/demandes.ts`).
+  evidence: Elles ne laissent qu'une ligne de console ; `lib/actions/` était interdit à cette session.

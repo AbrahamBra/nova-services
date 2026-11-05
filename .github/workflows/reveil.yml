@@ -1,0 +1,59 @@
+name: Réveil
+
+# L'offre gratuite de Supabase met un projet en pause après 7 jours sans
+# activité. Chaque jour, cette tâche envoie une vraie requête, en lecture
+# seule, à chaque projet (AD-12). Le résultat n'est pas affiché.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+  # Exécution d'essai à chaque modification de ce fichier (décision Q1).
+  push:
+    paths:
+      - .github/workflows/reveil.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reveil
+  cancel-in-progress: false
+
+jobs:
+  reveil:
+    name: Réveiller ${{ matrix.environnement }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environnement: developpement
+            secret: DEV_SUPABASE_DB_URL
+          - environnement: production
+            secret: PROD_SUPABASE_DB_URL
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Interroger la base
+        env:
+          ENVIRONNEMENT: ${{ matrix.environnement }}
+          DB_URL: ${{ secrets[matrix.secret] }}
+          PGCONNECT_TIMEOUT: "10"
+          PGSSLMODE: require
+        run: |
+          if [ -z "$DB_URL" ]; then
+            if [ "$ENVIRONNEMENT" = production ]; then
+              echo "::notice::production non configurée (secret PROD_SUPABASE_DB_URL vide) : rien à réveiller."
+              echo "production non configurée" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "::error::Secret DEV_SUPABASE_DB_URL vide."
+            exit 1
+          fi
+          psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 \
+            -c "begin read only; select count(*) from public.demandes; commit;" > /dev/null
+          echo "Projet $ENVIRONNEMENT réveillé."
+          echo "Projet $ENVIRONNEMENT réveillé." >> "$GITHUB_STEP_SUMMARY"

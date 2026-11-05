@@ -20,6 +20,7 @@
     "journal": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/journal.ts"
   },
   "dependencies": {
+    "@sentry/nextjs": "~11.10.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "~2.118.0",
     "class-variance-authority": "^0.7.1",

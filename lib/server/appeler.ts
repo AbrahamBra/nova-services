@@ -1,4 +1,5 @@
 import "server-only";
+import * as Sentry from "@sentry/nextjs";
 import {
   estCodeErreur,
   messageErreur,
@@ -36,6 +37,16 @@ function echec(code: CodeErreur): { ok: false; code: CodeErreur; message: string
   return { ok: false, code, message: messageErreur(code) };
 }
 
+/** Trace une erreur imprévue dans la console et dans Sentry (sans effet sans DSN). */
+function signaler(message: string): void {
+  console.error(message);
+  try {
+    Sentry.captureMessage(message, "error");
+  } catch {
+    // Le suivi des erreurs ne doit jamais faire échouer appeler().
+  }
+}
+
 /** DETAIL d'une erreur prévue, s'il s'agit d'un objet JSON ; sinon undefined. */
 function lireDetail(details: string | null | undefined): Record<string, unknown> | undefined {
   if (typeof details !== "string" || details === "") return undefined;
@@ -70,17 +81,15 @@ export async function appeler<T>(
         const detail = lireDetail(error.details);
         return detail ? { ...echec(code), detail } : echec(code);
       }
-      // Erreur imprévue : elle sera transmise à Sentry (story dédiée). En
-      // attendant, trace minimale : nom de la fonction et code Postgres
-      // seulement, jamais les paramètres ni le message (AD-14).
-      console.error(
-        `[appeler] erreur inattendue : fonction=${fonction} code=${error.code ?? "inconnu"}`,
-      );
+      // Erreur imprévue : console et Sentry reçoivent le nom de la fonction
+      // et le code Postgres seulement, jamais les paramètres ni le message
+      // (AD-14).
+      signaler(`[appeler] erreur inattendue : fonction=${fonction} code=${error.code ?? "inconnu"}`);
       return echec("ERREUR_INATTENDUE");
     }
     return { ok: true, donnees: data as T };
   } catch {
-    console.error(`[appeler] exception : fonction=${fonction} code=aucun`);
+    signaler(`[appeler] exception : fonction=${fonction} code=aucun`);
     return echec("ERREUR_INATTENDUE");
   }
 }
