@@ -266,11 +266,13 @@ export async function lireDetailAvec(
       { data: lignes, error: erreurHistorique },
       { data: lignesNotes, error: erreurNotes },
     ] = await Promise.all([
+      // Ordre d'écriture (`id`) : deux changements simultanés s'enchaînent
+      // sous le verrou, mais la transaction bloquée garde un `now()` antérieur
+      // (story 2.4, migration 0017).
       client
         .from("historique")
         .select(COLONNES_HISTORIQUE)
         .eq("demande_id", d.id as string)
-        .order("cree_le", { ascending: true })
         .order("id", { ascending: true }),
       client
         .from("notes")

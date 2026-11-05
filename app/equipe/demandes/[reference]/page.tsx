@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ActionsStatut, BoutonPrendreEnCharge } from "@/components/nova/actions-demande";
+import {
+  ActionsStatut,
+  BoutonPrendreEnCharge,
+  ChoixCategorie,
+  ChoixPriorite,
+} from "@/components/nova/actions-demande";
 import { BadgePriorite, BadgeStatut } from "@/components/nova/badges";
 import { Historique } from "@/components/nova/historique";
 import { FormulaireNote, ListeNotes } from "@/components/nova/notes";
 import { BoutonReessayer } from "@/components/nova/reessayer";
+import { lireCategoriesActives, type CategoriesDetail } from "@/lib/categories";
 import { lireDetail, type DetailDemande } from "@/lib/detail-demande";
 import { LIBELLES_CANAL, type EtatEmail } from "@/lib/domaine";
 import { adresseAvecPage, lireNumeroPage } from "@/lib/filtres";
@@ -19,9 +25,12 @@ import { formaterDateHeure } from "@/lib/format";
 // et sans responsable. Story 2.2 : bloc « Notes internes », entre Demandeur
 // et Historique (liste et ajout, quel que soit le statut). Story 2.3 :
 // boutons de statut sous le badge (« Marquer comme traitée », « Rouvrir »,
-// « Classer sans suite » avec sa fenêtre de confirmation).
-// Les autres actions arrivent avec l'epic 2.
-// Lu avec la session de la personne connectée (RLS), jamais mis en cache.
+// « Classer sans suite » avec sa fenêtre de confirmation). Story 2.4 :
+// listes « Priorité » et « Catégorie » (catégories actives dans l'ordre des
+// formulaires, et état réel de la catégorie actuelle, lus seulement pour une
+// demande trouvée ; liste vide ou illisible : le nom seul et « Liste des
+// catégories indisponible. »). Libérer et attribuer : story 2.7.
+// Tout est lu avec la session de la personne connectée (RLS), jamais mis en cache.
 export const dynamic = "force-dynamic";
 
 /** Référence de l'adresse, décodée (une référence valide ne change pas). */
@@ -86,16 +95,31 @@ function adresseEmail(email: string): string {
   return `mailto:${encodeURIComponent(email.slice(0, arobase))}@${encodeURIComponent(email.slice(arobase + 1))}`;
 }
 
-function Info({ libelle, children }: { libelle: string; children: ReactNode }) {
+function Info({ libelle, id, children }: { libelle: string; id?: string; children: ReactNode }) {
   return (
     <div className="border-b border-border py-3 first:pt-0 last:border-b-0 last:pb-0">
-      <dt className="mb-1 text-[13px] text-muted-foreground">{libelle}</dt>
+      <dt id={id} className="mb-1 text-[13px] text-muted-foreground">
+        {libelle}
+      </dt>
       <dd className="text-[15px] font-medium break-words">{children}</dd>
     </div>
   );
 }
 
-function Detail({ demande }: { demande: DetailDemande }) {
+/** Libellés du panneau, cibles de `aria-labelledby` des deux listes. */
+const ID_LIBELLE_PRIORITE = "libelle-priorite";
+const ID_LIBELLE_CATEGORIE = "libelle-categorie";
+
+const MESSAGE_CATEGORIES_INDISPONIBLES = "Liste des catégories indisponible.";
+
+function Detail({
+  demande,
+  categories,
+}: {
+  demande: DetailDemande;
+  /** Catégories de la liste, ou null si elles n'ont pas pu être lues. */
+  categories: CategoriesDetail | null;
+}) {
   const bandeauEmail = BANDEAUX_EMAIL[demande.etatEmail];
   const lienTelephone = demande.telephone ? adresseTelephone(demande.telephone) : null;
   const categorie = demande.nomsCategories[demande.categorieId] ?? "—";
@@ -212,10 +236,37 @@ function Detail({ demande }: { demande: DetailDemande }) {
               {/* Story 2.3 : seul le passage permis pour ce statut (règle 1). */}
               <ActionsStatut demandeId={demande.id} statut={demande.statut} />
             </Info>
-            <Info libelle="Priorité">
+            <Info libelle="Priorité" id={ID_LIBELLE_PRIORITE}>
               <BadgePriorite priorite={demande.priorite} />
+              {/* Story 2.4 : quel que soit le statut (règle 3). */}
+              <ChoixPriorite
+                key={demande.id}
+                demandeId={demande.id}
+                priorite={demande.priorite}
+                idLibelle={ID_LIBELLE_PRIORITE}
+              />
             </Info>
-            <Info libelle="Catégorie">{categorie}</Info>
+            <Info libelle="Catégorie" id={ID_LIBELLE_CATEGORIE}>
+              {categories && categories.actuelle && categories.actives.length > 0 ? (
+                <ChoixCategorie
+                  key={demande.id}
+                  demandeId={demande.id}
+                  actuelle={categories.actuelle}
+                  actives={categories.actives}
+                  idLibelle={ID_LIBELLE_CATEGORIE}
+                />
+              ) : (
+                <>
+                  {categorie}
+                  <span
+                    data-testid="categories-indisponibles"
+                    className="mt-1 block text-[13px] font-normal text-muted-foreground"
+                  >
+                    {MESSAGE_CATEGORIES_INDISPONIBLES}
+                  </span>
+                </>
+              )}
+            </Info>
           </dl>
         </aside>
       </div>
@@ -269,10 +320,13 @@ export default async function PageDetailDemande({
     );
   }
 
+  // Seulement pour une demande trouvée.
+  const categories = await lireCategoriesActives(resultat.donnees.categorieId);
+
   return (
     <>
       {lienRetour}
-      <Detail demande={resultat.donnees} />
+      <Detail demande={resultat.donnees} categories={categories.ok ? categories.donnees : null} />
     </>
   );
 }

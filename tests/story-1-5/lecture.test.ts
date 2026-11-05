@@ -126,12 +126,15 @@ describe("vue demandes_liste — membre actif", () => {
     }
   });
 
-  it("lit id, nom et actif dans categories, rien d'autre", async () => {
-    const { data, error } = await membre.from("categories").select("id, nom, actif");
+  // Story 2.4 : `ordre` aussi (liste « Catégorie » du détail, migration 0017).
+  it("lit id, nom, actif et ordre dans categories, rien d'autre", async () => {
+    const { data, error } = await membre.from("categories").select("id, nom, actif, ordre");
     expect(error).toBeNull();
     expect(data!.length).toBeGreaterThan(0);
-    const { error: refus } = await membre.from("categories").select("ordre").limit(1);
-    expect(refus?.code).toBe(PERMISSION_REFUSEE);
+    for (const colonne of ["cree_le", "*"]) {
+      const { error: refus } = await membre.from("categories").select(colonne).limit(1);
+      expect(refus?.code, `categories.${colonne}`).toBe(PERMISSION_REFUSEE);
+    }
   });
 
   it("ne lit jamais jeton_confirmation ni cle_envoi", async () => {
