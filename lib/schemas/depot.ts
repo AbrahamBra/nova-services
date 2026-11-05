@@ -61,7 +61,7 @@ export const MESSAGES_DEPOT = {
 const CARACTERE_NUL = String.fromCharCode(0);
 const sansCaractereNul = (valeur: string) => !valeur.includes(CARACTERE_NUL);
 
-function texteObligatoire(max: number, vide: string, long: string) {
+export function texteObligatoire(max: number, vide: string, long: string) {
   return z
     .string()
     .trim()
@@ -70,7 +70,7 @@ function texteObligatoire(max: number, vide: string, long: string) {
     .refine(sansCaractereNul, MESSAGES_DEPOT.caractereInterdit);
 }
 
-function texteFacultatif(max: number, long: string) {
+export function texteFacultatif(max: number, long: string) {
   return z
     .string()
     .trim()

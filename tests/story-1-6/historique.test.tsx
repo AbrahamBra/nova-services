@@ -48,7 +48,7 @@ describe("historique — phrases des 10 types", () => {
     ],
     [
       ligne("creation", { auteurId: NADIA, nouvelleValeur: "telephone" }),
-      "Nadia Morel a saisi la demande (téléphone)",
+      "Saisie par Nadia Morel (téléphone)",
     ],
     // Story 2.1 : une seule ligne, auteur au milieu de la phrase.
     [
@@ -102,9 +102,9 @@ describe("historique — phrases des 10 types", () => {
     expect(texte(ligne("attribution", { nouvelleValeur: inconnu }))).not.toContain(inconnu);
   });
 
-  it("saisie interne avec un canal inconnu : « a saisi la demande », sans « (?) »", () => {
+  it("saisie interne avec un canal inconnu : « Saisie par … », sans « (?) »", () => {
     expect(texte(ligne("creation", { auteurId: NADIA, nouvelleValeur: "fax" }))).toBe(
-      "Nadia Morel a saisi la demande",
+      "Saisie par Nadia Morel",
     );
   });
 });

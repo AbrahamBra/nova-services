@@ -29,7 +29,7 @@ import { lireOptionsFiltres } from "@/lib/options-filtres";
 // pagination portent sur la liste filtrée ; sans résultat : « Aucune demande
 // ne correspond à ces filtres. » et « Effacer les filtres ». Une adresse non
 // canonique (valeur invalide, page hors bornes) redirige vers sa forme
-// canonique. « Saisir une demande » : story 2.6.
+// canonique. Story 2.6 : bouton « Saisir une demande » en haut de la liste.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -48,15 +48,24 @@ const CLASSE_LIEN_EFFACER =
 
 // Le total est dans une zone `role="status"` : son changement après un
 // filtre est annoncé par les lecteurs d'écran.
+// Bouton principal de la liste (EXPERIENCE.md §9.4), lien vers la saisie interne.
+const CLASSE_LIEN_SAISIR =
+  "inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto";
+
 function Entete({ total }: { total?: number }) {
   return (
-    <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <h1 className="text-2xl font-semibold leading-[1.3]">Demandes</h1>
-      <p role="status" data-testid="total" className="text-[15px] text-muted-foreground">
-        {total !== undefined && total > 0
-          ? `${formaterNombre(total)} ${total > 1 ? "demandes" : "demande"}`
-          : null}
-      </p>
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="text-2xl font-semibold leading-[1.3]">Demandes</h1>
+        <p role="status" data-testid="total" className="text-[15px] text-muted-foreground">
+          {total !== undefined && total > 0
+            ? `${formaterNombre(total)} ${total > 1 ? "demandes" : "demande"}`
+            : null}
+        </p>
+      </div>
+      <Link href="/equipe/demandes/nouvelle" className={CLASSE_LIEN_SAISIR}>
+        Saisir une demande
+      </Link>
     </div>
   );
 }

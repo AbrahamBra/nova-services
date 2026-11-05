@@ -250,20 +250,36 @@ test.describe("liste des demandes", () => {
   test("page hors bornes : ?page=abc redirige vers la page 1, ?page=99999 vers la dernière page", async ({
     page,
   }) => {
+    // Trois chargements de la liste, lents sur une base partagée très remplie.
+    test.setTimeout(90_000);
     await ouvrirListe(page);
 
     await page.goto("/equipe/demandes?page=abc");
     await expect(page).toHaveURL(/\/equipe\/demandes$/, NAVIGATION);
     await expect(texteDePagination(page)).toHaveText(new RegExp(`^1–25 sur ${NOMBRE}$`));
+    const totalAvant = Number(
+      ((await texteDePagination(page).textContent()) ?? "").split("sur")[1].replace(/\D/g, ""),
+    );
 
     // Au moins 2 pages (26 demandes de remplissage) : adresse canonique de la dernière.
+    // Base partagée : d'autres tests peuvent ajouter des demandes entre deux lectures,
+    // donc la page de redirection est au moins la dernière page lue avant, et elle
+    // n'est pas vide (pas de « Suivant » inactif exigé : il dépend de ces ajouts).
     await page.goto("/equipe/demandes?page=99999");
-    await expect(page).toHaveURL(/\/equipe\/demandes\?page=([2-9]|[1-9]\d+)$/, NAVIGATION);
-    await expect(page.getByRole("navigation", { name: "Pagination" }).getByText("Suivant")).toHaveAttribute(
-      "aria-disabled",
-      "true",
-      NAVIGATION,
-    );
+    // Attendre la redirection : l'adresse demandée (99999) correspondrait aussi au motif.
+    await expect(page).toHaveURL((url) => {
+      const n = Number(url.searchParams.get("page"));
+      return url.pathname === "/equipe/demandes" && n >= 2 && n < 99999;
+    }, NAVIGATION);
+    // Des suppressions parallèles peuvent provoquer une seconde redirection :
+    // on relit l'adresse et le texte ensemble jusqu'à ce qu'ils concordent.
+    await expect(async () => {
+      const numero = Number(new URL(page.url()).searchParams.get("page"));
+      const texte = (await texteDePagination(page).textContent()) ?? "";
+      expect(texte).toMatch(new RegExp(`^${(numero - 1) * 25 + 1}–${NOMBRE} sur ${NOMBRE}$`));
+      expect(numero).toBeGreaterThanOrEqual(2);
+    }).toPass(NAVIGATION);
+    expect(totalAvant).toBeGreaterThan(25);
   });
 
   test("affichage selon la largeur : cartes sur téléphone, tableau réduit sur tablette", async ({

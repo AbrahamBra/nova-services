@@ -39,6 +39,8 @@ export const MESSAGES_ERREUR = {
   // quand la base donne le nom du responsable (détail de l'erreur).
   DEJA_PRISE: "Déjà prise en charge par un autre membre de l'équipe.",
   PASSAGE_INTERDIT: "Ce changement de statut n'est pas autorisé.",
+  // Story 2.6 — saisie interne (saisir_demande) : ni email ni téléphone.
+  COORDONNEES_REQUISES: "Indiquez au moins un email ou un téléphone.",
   // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
   ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
 } as const;

@@ -31,6 +31,8 @@ import { Client } from "pg";
 // connecté (rien pour un compte qui n'est pas membre actif ; migration 0019) ; la colonne
 // `demandes.recherche` et prive.normaliser restent sans aucun droit ; rien
 // pour anon.
+// Story 2.6 : saisir_demande pour le membre connecté (la fonction vérifie
+// elle-même qu'il est actif) ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -53,6 +55,7 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
   "authenticated:fonction:public.rechercher_demandes(p_texte text):EXECUTE",
+  "authenticated:fonction:public.saisir_demande(p_cle_envoi uuid, p_canal text, p_nom text, p_email text, p_telephone text, p_societe text, p_categorie_id uuid, p_objet text, p_description text):EXECUTE",
   "authenticated:table:public.demandes_liste:SELECT",
   ...COLONNES_DEMANDES.map((c) => `authenticated:colonne:public.demandes.${c}:SELECT`),
   ...["id", "nom", "etat"].map((c) => `authenticated:colonne:public.membres.${c}:SELECT`),
