@@ -28,17 +28,17 @@ Les sauvegardes qui contiennent encore ces données disparaissent d'elles-mêmes
 
 ## Données de test
 
-Pendant le développement, on n'utilise que des données **fictives**, préfixées « TEST- ». Elles sont retirées de la production avant l'ouverture au public. Les tests automatiques refusent de tourner sur la base de production.
+Pendant le développement, on n'utilise que des données **fictives**, préfixées « TEST- ». La production n'en reçoit jamais : elle est créée vide, seules les migrations y sont appliquées (jamais `supabase/seed.sql` ni `supabase/essai/`), et les scripts de données d'essai et de comptes de test la refusent. Les tests automatiques refusent de tourner sur la base de production.
 
 ## Qui traite les données, et où
 
 | Service | Ce qu'il voit ou garde | Où |
 |---|---|---|
 | Supabase | La base de données : toutes les données du tableau ci-dessus. | Irlande (région `eu-west-1`, Union européenne), développement comme production. |
-| Netlify | Héberge le site ; voit passer les adresses IP des visiteurs et le contenu des formulaires envoyés. | Région et base du transfert hors UE : À compléter (story 3.1). |
-| Resend | Envoie les emails : voit les adresses email des demandeurs et le texte de l'email de confirmation. | Région et base du transfert hors UE : À compléter (story 3.1). |
-| GitHub | Garde les sauvegardes, **chiffrées** et illisibles sans la phrase secrète, pendant 30 jours. Le stockage peut être hors de l'UE. | Base du transfert : À compléter (story 3.1). |
-| Sentry | Suivi des erreurs, sans aucune donnée personnelle. | Région UE. À compléter (story 3.3). |
+| Netlify | Héberge le site ; voit passer les adresses IP des visiteurs et le contenu des formulaires envoyés (il ne garde pas les demandes : elles vont dans Supabase). | Les fonctions du serveur tournent par défaut dans une région des **États-Unis**, non modifiable sur l'offre gratuite : le contenu des formulaires y transite. Société américaine : transfert hors UE encadré par son accord de traitement des données (clauses contractuelles types de la Commission européenne), **à confirmer par Abraham**. Le site de production n'utilise que la base de production ; les prévisualisations n'utilisent que la base de développement, aux données fictives. |
+| Resend | Envoie les emails : voit les adresses email des demandeurs et le texte de l'email de confirmation. | **Pas utilisé en production pour l'instant** (aucune clé saisie : aucun email ne part, la demande reste enregistrée). Utilisé en développement, avec des données fictives. Société américaine : avant de l'activer en production, vérifier son accord de traitement des données (clauses contractuelles types), **à confirmer par Abraham**. |
+| GitHub | Garde les sauvegardes, **chiffrées** et illisibles sans la phrase secrète, pendant 30 jours. Le stockage peut être hors de l'UE. | Société américaine : transfert encadré par son accord de traitement des données (clauses contractuelles types), **à confirmer par Abraham**. GitHub ne voit que des fichiers chiffrés. |
+| Sentry | Suivi des erreurs, sans aucune donnée personnelle : ni utilisateur, ni corps de formulaire, ni cookie, ni en-tête, ni paramètre d'adresse ; emails et téléphones masqués dans les messages ; pas d'enregistrement de session. | Organisation créée en **région UE** (envois vers `ingest.de.sentry.io`, Allemagne) ; enregistrement des adresses IP désactivé pour l'organisation (*Prevent Storing of IP Addresses*). |
 
 ## Emails en mode démonstration
 

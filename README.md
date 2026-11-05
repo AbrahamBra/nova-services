@@ -2,7 +2,7 @@
 
 Application de gestion des demandes clients de Nova Services : les clients déposent leur demande en ligne, sans compte, et l'équipe les suit dans un espace sécurisé. Projet de formation, avec des données fictives.
 
-Stack : Next.js 16, React 19, TypeScript, Supabase (région Paris), Tailwind CSS, shadcn/ui, Vitest, Playwright.
+Stack : Next.js 16, React 19, TypeScript, Supabase (région Irlande, `eu-west-1`), Tailwind CSS, shadcn/ui, Vitest, Playwright.
 
 La méthode et les documents de conception (PRD, UX, architecture, epics) sont dans [`_bmad-output/planning-artifacts/`](_bmad-output/planning-artifacts/).
 
@@ -16,6 +16,8 @@ La méthode et les documents de conception (PRD, UX, architecture, epics) sont d
 6. Démarrer l'application : `npm run dev`, puis ouvrir http://localhost:3000
 
 `.env.local` contient les clés : il n'est **jamais** versionné.
+
+Mise en ligne (Netlify, projet Supabase de production, `.env.scripts-production.local`) : voir [`docs/exploitation/deploiement.md`](docs/exploitation/deploiement.md).
 
 ## Données d'essai (développement seulement)
 

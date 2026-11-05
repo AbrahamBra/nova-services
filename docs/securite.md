@@ -15,8 +15,9 @@ Un secret est une clé, un mot de passe ou une adresse de connexion qui donne ac
 | Où | Ce qu'on y trouve |
 |---|---|
 | `.env.local` (sur le poste de développement) | Les clés du projet de **développement**. Ce fichier est exclu de Git (règle `.env*` dans `.gitignore`). Le modèle sans valeurs est [`.env.example`](../.env.example). |
-| Secrets GitHub (*Settings → Secrets and variables → Actions*) | `DEV_SUPABASE_URL`, `DEV_SUPABASE_PUBLISHABLE_KEY`, `DEV_SUPABASE_SECRET_KEY`, `DEV_SUPABASE_DB_URL` (envoyés par `npm run secrets:github`), `SAUVEGARDE_PHRASE` (phrase de chiffrement des sauvegardes), et `PROD_SUPABASE_DB_URL` à créer à la story 3.1. Une fois enregistrés, ils ne peuvent plus être relus. |
-| Variables Netlify | Les clés de **production** (liste dans [deploiement.md](exploitation/deploiement.md#variables-denvironnement)), dont `SENTRY_AUTH_TOKEN`. À compléter (story 3.1). |
+| Secrets GitHub (*Settings → Secrets and variables → Actions*) | `DEV_SUPABASE_URL`, `DEV_SUPABASE_PUBLISHABLE_KEY`, `DEV_SUPABASE_SECRET_KEY`, `DEV_SUPABASE_DB_URL` (envoyés par `npm run secrets:github`), `SAUVEGARDE_PHRASE` (phrase de chiffrement des sauvegardes), et `PROD_SUPABASE_DB_URL` (adresse du pooler de la base de production, envoyée par `npm run secrets:github -- --production`). Une fois enregistrés, ils ne peuvent plus être relus. |
+| `.env.scripts-production.local` (sur le poste du responsable technique seulement) | Les clés de la **production**, utilisées seulement pour appliquer les migrations, créer le premier administrateur et envoyer le secret GitHub `PROD_SUPABASE_DB_URL` (voir [deploiement.md](exploitation/deploiement.md#le-fichier-envscripts-productionlocal-poste-du-responsable-technique)). Exclu de Git (règle `.env*`). |
+| Variables Netlify | Par contexte : clés de la **production** pour le site de production, clés du **développement** pour les prévisualisations et les branches, `HMAC_SECRET` différent en production, DSN Sentry (liste dans [deploiement.md](exploitation/deploiement.md#ce-quon-saisit-dans-netlify-par-contexte)). Jamais `SUPABASE_DB_URL` ni `IP_DE_TEST_AUTORISEE`. Pas de `SENTRY_AUTH_TOKEN` pour l'instant. |
 | Fichier `Documents\nova-phrase-sauvegardes.txt` d'Abraham et sa copie de secours | La phrase de chiffrement des sauvegardes. Sans elle, aucune sauvegarde ne peut être relue. |
 
 - **Recherche automatique de secrets** : à chaque demande de fusion et à chaque envoi sur `main`, la tâche « Tests » lance gitleaks sur tout l'historique Git. Si elle trouve un secret, la tâche est rouge et on ne fusionne pas.
@@ -30,7 +31,7 @@ Un secret est une clé, un mot de passe ou une adresse de connexion qui donne ac
 
 ## Suivi des erreurs
 
-À compléter (story 3.3) : Sentry, région UE, sans aucune donnée personnelle ; où consulter les erreurs ; alerte par email.
+Les erreurs imprévues sont envoyées à **Sentry**, organisation en région UE (adresse `ingest.de.sentry.io`). Aucun nom, email, téléphone, texte de formulaire ni adresse IP n'est envoyé : le code les retire avant l'envoi, et « Prevent Storing of IP Addresses » est activé dans Sentry. On consulte les erreurs dans Sentry, menu **Issues** (compte du responsable technique) ; un email d'alerte arrive à chaque nouvelle erreur importante. Pour vérifier que tout fonctionne : Administration → « Page de test du suivi des erreurs ». Sentry n'est actif que si `NEXT_PUBLIC_SENTRY_DSN` est rempli.
 
 ## Si un secret a fuité
 
@@ -44,8 +45,8 @@ Un secret a fuité dès qu'il a été écrit dans un commit, collé dans un mess
    - `HMAC_SECRET` : nouvelle valeur au hasard. **Attention** : les empreintes déjà enregistrées ne correspondent plus. Les compteurs de l'anti-spam et des tentatives de connexion repartent donc de zéro ;
    - phrase de sauvegarde : voir plus bas.
 2. **Mettez à jour partout où il est utilisé** :
-   - `.env.local` sur chaque poste de développement ;
-   - les secrets GitHub : `npm run secrets:github` envoie seulement les quatre secrets `DEV_*`, depuis `.env.local`. `PROD_SUPABASE_DB_URL` se met à jour à la main (*Settings → Secrets and variables → Actions*, ou `gh secret set PROD_SUPABASE_DB_URL`) ;
+   - `.env.local` sur chaque poste de développement, et `.env.scripts-production.local` sur le poste du responsable technique pour un secret de production ;
+   - les secrets GitHub : `npm run secrets:github` envoie seulement les quatre secrets `DEV_*`, depuis `.env.local`. `PROD_SUPABASE_DB_URL` se met à jour avec `npm run secrets:github -- --production`, depuis `.env.scripts-production.local` ;
    - les variables Netlify, puis relancez une mise en ligne pour qu'elles soient prises en compte.
 3. **Vérifiez** : la tâche « Tests » et la « Sauvegarde nocturne » lancée à la main sont vertes, le site fonctionne.
 4. **Si le secret était dans un commit** : le changer suffit, car l'ancien ne sert plus à rien. Ne cherchez pas à réécrire l'historique Git. Mais gitleaks continuera de le trouver, et « Tests » restera rouge, ce qui bloque toutes les fusions. **Une fois le secret révoqué, et seulement à ce moment-là**, ajoutez ce signalement précis à la liste des exceptions de `.gitleaks.toml`, avec une phrase qui explique pourquoi.

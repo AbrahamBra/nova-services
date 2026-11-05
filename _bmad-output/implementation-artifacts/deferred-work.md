@@ -82,3 +82,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
   summary: Envoyer aussi à Sentry les erreurs imprévues qui ne passent pas par `appeler()` (`lib/session.ts`, `lib/demandes.ts`, `lib/detail-demande.ts`, `lib/actions/demandes.ts`).
   evidence: Elles ne laissent qu'une ligne de console ; `lib/actions/` était interdit à cette session.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-mettre-en-ligne.md`
+  summary: Tester `db:push --production` jusqu'à l'appel de la CLI (adresse transmise, option `--production` retirée des arguments).
+  evidence: La CLI est résolue par `require.resolve` ; il faudrait exposer la liste des arguments ou simuler la CLI.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-mettre-en-ligne.md`
+  summary: Vérifier en CI que l'étiquette `vX.Y.Z` d'une mise en ligne est égale à la version de `package.json`.
+  evidence: Règle écrite dans `docs/exploitation/deploiement.md`, appliquée à la main pour l'instant.
