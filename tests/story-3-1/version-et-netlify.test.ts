@@ -163,3 +163,16 @@ describe("fichier des clés de production des scripts", () => {
     expect(r.status).toBe(0);
   });
 });
+
+describe("dossier .netlify (fichiers générés pendant la construction)", () => {
+  // Sur Netlify, la construction crée .netlify/ (extensions, déclarations
+  // Deno) avant `npm run verifier` : le lint et le typage ne doivent pas
+  // l'examiner, sinon la construction échoue (incident du 05/11/2026).
+  it("est ignoré par ESLint, TypeScript et Git", () => {
+    expect(lire("eslint.config.mjs")).toContain('".netlify/**"');
+    const tsconfig = JSON.parse(lire("tsconfig.json")) as { exclude?: string[] };
+    expect(tsconfig.exclude).toContain(".netlify");
+    const git = spawnSync("git", ["check-ignore", "-q", ".netlify/essai.ts"], { cwd: racine });
+    expect(git.status).toBe(0);
+  });
+});

@@ -19,6 +19,9 @@ const eslintConfig = defineConfig([
     // Rapports de tests :
     "playwright-report/**",
     "test-results/**",
+    // Fichiers générés par Netlify pendant la construction (extensions,
+    // déclarations Deno) : ce ne sont pas nos sources (story 3.1).
+    ".netlify/**",
   ]),
 ]);
 
