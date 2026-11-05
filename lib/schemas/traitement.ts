@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { formaterNombre } from "@/lib/format";
+import { PRIORITES } from "@/lib/domaine";
 import { longueur } from "@/lib/schemas/depot";
 
 // Saisies des actions de traitement des demandes (epic 2). La base revérifie
@@ -8,6 +9,7 @@ import { longueur } from "@/lib/schemas/depot";
 // l'action `ajouterNote` (AD-8) ; même limite que la base (ajouter_note).
 // Story 2.3 : statut demandé à `changer_statut` et raison d'un classement
 // sans suite (même règle que le texte d'une note, message propre).
+// Story 2.4 : priorité et catégorie (voir en fin de fichier).
 
 /** Identifiant d'une demande (uuid). */
 export const schemaIdentifiantDemande = z.guid();
@@ -76,3 +78,13 @@ export function verifierRaisonClassement(saisie: unknown): VerificationNote {
   if (resultat.ok) return resultat;
   return { ok: false, message: MESSAGE_CLASSEMENT[resultat.message] ?? MESSAGES_CLASSEMENT.vide };
 }
+
+// Story 2.4 : priorité demandée à `changer_priorite` (codes fermés de
+// lib/domaine.ts) et catégorie demandée à `changer_categorie` (uuid ; la base
+// vérifie qu'elle existe et qu'elle est active).
+
+/** Priorité qu'un changement de priorité peut demander. */
+export const schemaPrioriteDemande = z.enum(PRIORITES);
+
+/** Identifiant d'une catégorie (uuid). */
+export const schemaIdentifiantCategorie = z.guid();

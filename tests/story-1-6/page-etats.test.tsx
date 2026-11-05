@@ -21,6 +21,21 @@ vi.mock("@/lib/detail-demande", () => ({
   },
 }));
 
+// Story 2.4 : catégories de la liste « Catégorie », lues avec la session (sans base).
+const categories = vi.hoisted(() => ({ resultat: null as unknown, appels: 0 }));
+
+vi.mock("@/lib/categories", () => ({
+  lireCategoriesActives: async () => {
+    categories.appels++;
+    return categories.resultat;
+  },
+}));
+
+vi.mock("next/navigation", async (original) => ({
+  ...(await original<typeof import("next/navigation")>()),
+  useRouter: () => ({ refresh: () => {} }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: Record<string, unknown>) => (
     <a href={String(href)} className={className as string | undefined}>
@@ -87,9 +102,22 @@ async function rendre(reference: string, parametres: Record<string, string> = {}
   return renderToStaticMarkup(<FournisseurToasts>{element}</FournisseurToasts>);
 }
 
+const CATEGORIES_LISIBLES = {
+  ok: true,
+  donnees: {
+    actives: [
+      { id: "0b6c1f7e-0000-4000-8000-0000000000c0", nom: "Demande d'information" },
+      { id: CATEGORIE, nom: "Problème technique" },
+    ],
+    actuelle: { id: CATEGORIE, nom: "Problème technique", actif: true },
+  },
+};
+
 beforeEach(() => {
   lecture.resultat = null;
   lecture.reference = null;
+  categories.resultat = CATEGORIES_LISIBLES;
+  categories.appels = 0;
 });
 
 describe("page /equipe/demandes/[reference] — états", () => {
@@ -114,6 +142,8 @@ describe("page /equipe/demandes/[reference] — états", () => {
     expect(lecture.reference).toBe("abc");
     expect(html).toContain("Demande introuvable.");
     expect(html).toContain('href="/equipe/demandes"');
+    // Story 2.4 : les catégories ne sont lues que pour une demande trouvée.
+    expect(categories.appels).toBe(0);
   });
 
   it("détail complet : en-tête, badges, « Reçue le … via Formulaire », demandeur, historique", async () => {
@@ -201,5 +231,28 @@ describe("page /equipe/demandes/[reference] — états", () => {
   it.each(["en_attente", "sans_email"] as const)("email %s : aucun bandeau", async (etatEmail) => {
     donner({ ok: true, donnees: detail({ etatEmail }) });
     expect(await rendre("NOVA-2026-0042")).not.toContain('data-testid="bandeau-email"');
+  });
+
+  it.each([
+    ["illisibles", { ok: false, code: "ERREUR_INATTENDUE", message: "x" }],
+    ["vides", { ok: true, donnees: { actives: [], actuelle: null } }],
+  ])("catégories %s : nom seul et « Liste des catégories indisponible. », sans liste", async (_cas, resultat) => {
+    categories.resultat = resultat;
+    donner({ ok: true, donnees: detail() });
+    const html = await rendre("NOVA-2026-0042");
+    expect(categories.appels).toBe(1);
+    expect(html).toContain("Problème technique");
+    expect(html).toMatch(/data-testid="categories-indisponibles"[^>]*>Liste des catégories indisponible\.</);
+    expect(html).not.toContain('data-testid="choix-categorie"');
+    expect(html).toContain('data-testid="choix-priorite"');
+  });
+
+  it("listes libellées par les <dt> du panneau (aria-labelledby)", async () => {
+    donner({ ok: true, donnees: detail() });
+    const html = await rendre("NOVA-2026-0042");
+    expect(html).toMatch(/<dt id="libelle-priorite"[^>]*>Priorité<\/dt>/);
+    expect(html).toMatch(/<dt id="libelle-categorie"[^>]*>Catégorie<\/dt>/);
+    expect(html).toMatch(/<select[^>]*aria-labelledby="libelle-priorite"/);
+    expect(html).toMatch(/<select[^>]*aria-labelledby="libelle-categorie"/);
   });
 });

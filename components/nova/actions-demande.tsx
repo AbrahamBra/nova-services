@@ -1,6 +1,17 @@
 "use client";
 
-import { useId, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import {
+  startTransition,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Bouton } from "@/components/nova/bouton";
 import { useToasts } from "@/components/nova/toasts";
 import {
@@ -15,15 +26,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  changerCategorie,
+  changerPriorite,
   changerStatut,
   classerSansSuite,
   prendreEnCharge,
   type EtatApresStatut,
   type ResultatChangementStatut,
 } from "@/lib/actions/demandes";
-import { LIBELLES_STATUT, type Statut } from "@/lib/domaine";
+import {
+  LIBELLES_PRIORITE,
+  LIBELLES_STATUT,
+  PRIORITES,
+  type Priorite,
+  type Statut,
+} from "@/lib/domaine";
 import { messageErreur, type CodeErreur } from "@/lib/erreurs";
 import { formaterNombre } from "@/lib/format";
 import { longueur } from "@/lib/schemas/depot";
@@ -43,6 +63,8 @@ import {
 // Story 2.3 : partie « Statut », seuls passages permis par la règle 1 :
 // « Marquer comme traitée » (En cours), « Rouvrir » (Traitée), « Classer
 // sans suite » (Nouvelle, fenêtre de confirmation avec raison obligatoire).
+// Story 2.4 : listes « Priorité » et « Catégorie », quel que soit le statut ;
+// le choix d'une valeur l'enregistre aussitôt.
 
 /** Message de réussite de la prise en charge (EXPERIENCE.md §10, flow 2). */
 export const MESSAGE_PRISE_EN_CHARGE = "Vous êtes responsable de cette demande.";
@@ -400,5 +422,205 @@ export function ActionsStatut({ demandeId, statut }: { demandeId: string; statut
     >
       {action}
     </div>
+  );
+}
+
+// --- Priorité et catégorie (story 2.4) ----------------------------------------
+
+/** Messages de réussite (EXPERIENCE.md §4) : « Priorité modifiée : Haute. ». */
+export function messagePrioriteModifiee(priorite: Priorite): string {
+  return `Priorité modifiée : ${LIBELLES_PRIORITE[priorite]}.`;
+}
+
+export function messageCategorieModifiee(nom: string): string {
+  return `Catégorie modifiée : ${nom}.`;
+}
+
+/** Suffixe de la catégorie actuelle quand elle a été désactivée (règle 9). */
+export const SUFFIXE_CATEGORIE_DESACTIVEE = " (désactivée)";
+
+/** Catégorie proposée dans la liste (active, dans l'ordre des formulaires). */
+export type CategorieProposee = { id: string; nom: string };
+
+/** Catégorie actuelle de la demande, avec son état réel. */
+export type CategorieActuelle = CategorieProposee & { actif: boolean };
+
+const CLASSE_LISTE =
+  "mt-3 w-full [&_select]:h-11 [&_select]:rounded-md [&_select]:bg-surface [&_select]:pl-3 [&_select]:text-[15px]";
+
+type ResultatEnvoi =
+  | { ok: true; donnees: { modifiee: boolean } }
+  | { ok: false; code: CodeErreur; message: string };
+
+/**
+ * Liste qui enregistre aussitôt la valeur choisie, libellée par le `<dt>` du
+ * panneau (`aria-labelledby`). Pendant l'envoi : la valeur choisie reste
+ * affichée et la liste est désactivée (deux choix rapides n'envoient qu'un
+ * appel). Réussite : toast (aucun si la valeur était déjà en place), la liste
+ * suit la valeur rafraîchie par l'action serveur. Refus : toast rouge, valeur
+ * précédente remise (le détail est rafraîchi par l'action). Erreur
+ * inattendue ou réponse perdue (la base a pu enregistrer) : toast rouge et
+ * rafraîchissement depuis le navigateur, pour montrer la vraie valeur. La
+ * liste perd le focus en étant désactivée : il lui est rendu à la fin.
+ */
+function ListeEnregistree<T extends string>({
+  idLibelle,
+  valeur,
+  options,
+  envoyer,
+  messageReussite,
+  testId,
+}: {
+  idLibelle: string;
+  valeur: T;
+  options: { valeur: T; texte: string; disabled?: boolean }[];
+  envoyer: (valeur: T) => Promise<ResultatEnvoi>;
+  messageReussite: (valeur: T) => string;
+  testId: string;
+}) {
+  const router = useRouter();
+  const liste = useRef<HTMLSelectElement>(null);
+  const [envoi, demarrer] = useTransition();
+  // Appel « en vol » : deux choix avant le nouveau rendu n'envoient qu'un appel.
+  const enVol = useRef(false);
+  const rendreFocus = useRef(false);
+  // Valeur choisie, affichée pendant l'envoi et tant que la valeur reçue n'a
+  // pas changé (`depuis`) ; retirée à la fin de l'envoi.
+  const [attente, setAttente] = useState<{ valeur: T; depuis: T } | null>(null);
+  const { afficher } = useToasts();
+
+  // Fin de l'envoi, liste réactivée : focus rendu, sauf si la personne l'a
+  // déjà placé ailleurs (la liste désactivée l'a perdu au profit de <body>).
+  useEffect(() => {
+    if (envoi || !rendreFocus.current) return;
+    const element = liste.current;
+    if (!element || element.disabled) return;
+    rendreFocus.current = false;
+    const actif = document.activeElement;
+    if (actif === null || actif === document.body || actif === element) element.focus();
+  }, [envoi]);
+
+  const affichee = attente !== null && attente.depuis === valeur ? attente.valeur : valeur;
+
+  function choisir(evenement: ChangeEvent<HTMLSelectElement>) {
+    const choisie = evenement.target.value as T;
+    if (enVol.current || choisie === affichee) return;
+    enVol.current = true;
+    rendreFocus.current = true;
+    setAttente({ valeur: choisie, depuis: valeur });
+    demarrer(async () => {
+      let resultat: ResultatEnvoi;
+      try {
+        resultat = await envoyer(choisie);
+      } catch {
+        // Action injoignable ou réponse perdue.
+        resultat = {
+          ok: false,
+          code: "ERREUR_INATTENDUE",
+          message: messageErreur("ERREUR_INATTENDUE"),
+        };
+      } finally {
+        enVol.current = false;
+      }
+      if (resultat.ok) {
+        if (resultat.donnees.modifiee) afficher("succes", messageReussite(choisie));
+      } else {
+        afficher("erreur", resultat.message);
+        if (resultat.code === "ERREUR_INATTENDUE") router.refresh();
+      }
+      // Dans la transition : retirée en même temps que le nouveau rendu.
+      startTransition(() => setAttente(null));
+    });
+  }
+
+  return (
+    <NativeSelect
+      ref={liste}
+      value={affichee}
+      onChange={choisir}
+      disabled={envoi}
+      aria-labelledby={idLibelle}
+      aria-busy={envoi || undefined}
+      data-testid={testId}
+      className={CLASSE_LISTE}
+    >
+      {options.map((option) => (
+        <NativeSelectOption key={option.valeur} value={option.valeur} disabled={option.disabled}>
+          {option.texte}
+        </NativeSelectOption>
+      ))}
+    </NativeSelect>
+  );
+}
+
+/** Liste « Priorité » (Basse, Normale, Haute), sous le badge actuel. */
+export function ChoixPriorite({
+  demandeId,
+  priorite,
+  idLibelle,
+}: {
+  demandeId: string;
+  priorite: Priorite;
+  /** Identifiant du `<dt>` « Priorité » du panneau. */
+  idLibelle: string;
+}) {
+  return (
+    <ListeEnregistree<Priorite>
+      idLibelle={idLibelle}
+      valeur={priorite}
+      options={PRIORITES.map((p) => ({ valeur: p, texte: LIBELLES_PRIORITE[p] }))}
+      envoyer={(valeur) => changerPriorite(demandeId, valeur)}
+      messageReussite={messagePrioriteModifiee}
+      testId="choix-priorite"
+    />
+  );
+}
+
+/**
+ * Options de la liste « Catégorie » : les catégories actives, dans l'ordre
+ * des formulaires. Si la catégorie actuelle est désactivée (état réel), elle
+ * vient en tête, suivie de « (désactivée) », sans pouvoir être choisie à
+ * nouveau.
+ */
+export function optionsCategorie(
+  actuelle: CategorieActuelle,
+  actives: CategorieProposee[],
+): { valeur: string; texte: string; disabled?: boolean }[] {
+  const options = actives.map((c) => ({ valeur: c.id, texte: c.nom }));
+  if (actuelle.actif) return options;
+  return [
+    {
+      valeur: actuelle.id,
+      texte: `${actuelle.nom}${SUFFIXE_CATEGORIE_DESACTIVEE}`,
+      disabled: true,
+    },
+    ...options,
+  ];
+}
+
+/** Liste « Catégorie » : modifiable par l'équipe (EXPERIENCE.md §9.5). */
+export function ChoixCategorie({
+  demandeId,
+  actuelle,
+  actives,
+  idLibelle,
+}: {
+  demandeId: string;
+  /** Catégorie actuelle de la demande, nom actuel et état réel (règle 9). */
+  actuelle: CategorieActuelle;
+  actives: CategorieProposee[];
+  /** Identifiant du `<dt>` « Catégorie » du panneau. */
+  idLibelle: string;
+}) {
+  const nomDe = (id: string) => actives.find((c) => c.id === id)?.nom ?? actuelle.nom;
+  return (
+    <ListeEnregistree<string>
+      idLibelle={idLibelle}
+      valeur={actuelle.id}
+      options={optionsCategorie(actuelle, actives)}
+      envoyer={(valeur) => changerCategorie(demandeId, valeur)}
+      messageReussite={(valeur) => messageCategorieModifiee(nomDe(valeur))}
+      testId="choix-categorie"
+    />
   );
 }

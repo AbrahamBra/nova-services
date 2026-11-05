@@ -25,6 +25,8 @@ import { Client } from "pg";
 // colonne par colonne (aucune écriture directe) ; rien pour anon.
 // Story 2.3 : changer_statut et classer_sans_suite pour le membre connecté ;
 // rien pour anon.
+// Story 2.4 : changer_priorite et changer_categorie pour le membre connecté,
+// et lecture de `categories.ordre` ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -39,6 +41,8 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
+  "authenticated:fonction:public.changer_categorie(p_demande_id uuid, p_categorie_id uuid):EXECUTE",
+  "authenticated:fonction:public.changer_priorite(p_demande_id uuid, p_priorite text):EXECUTE",
   "authenticated:fonction:public.changer_statut(p_demande_id uuid, p_statut text):EXECUTE",
   "authenticated:fonction:public.classer_sans_suite(p_demande_id uuid, p_note text):EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
@@ -46,7 +50,8 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:table:public.demandes_liste:SELECT",
   ...COLONNES_DEMANDES.map((c) => `authenticated:colonne:public.demandes.${c}:SELECT`),
   ...["id", "nom", "etat"].map((c) => `authenticated:colonne:public.membres.${c}:SELECT`),
-  ...["id", "nom", "actif"].map((c) => `authenticated:colonne:public.categories.${c}:SELECT`),
+  // Story 2.4 : `ordre` (liste « Catégorie » du détail, dans l'ordre des formulaires).
+  ...["id", "nom", "actif", "ordre"].map((c) => `authenticated:colonne:public.categories.${c}:SELECT`),
   ...COLONNES_HISTORIQUE.map((c) => `authenticated:colonne:public.historique.${c}:SELECT`),
   ...COLONNES_NOTES.map((c) => `authenticated:colonne:public.notes.${c}:SELECT`),
 ].sort();

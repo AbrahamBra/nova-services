@@ -20,12 +20,14 @@ import {
   LONGUEUR_MAX_NOTE,
   MESSAGES_NOTE,
   MESSAGES_CLASSEMENT,
+  schemaIdentifiantCategorie,
   schemaIdentifiantDemande,
+  schemaPrioriteDemande,
   schemaStatutDemande,
   verifierRaisonClassement,
   verifierTexteNote,
 } from "@/lib/schemas/traitement";
-import { STATUTS, type Statut } from "@/lib/domaine";
+import { PRIORITES, STATUTS, type Priorite, type Statut } from "@/lib/domaine";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur sur les demandes (AD-7). Story 1.3 : dépôt public ;
@@ -33,7 +35,7 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 // d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base) ;
 // story 2.1 : prise en charge (traitement, avec la session du membre) ;
 // story 2.2 : notes internes ; story 2.3 : changement de statut et
-// classement sans suite.
+// classement sans suite ; story 2.4 : priorité et catégorie.
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -506,4 +508,120 @@ export async function classerSansSuite(
 
   refresh();
   return { ok: true, donnees: etat };
+}
+
+// --- Priorité et catégorie (story 2.4) ----------------------------------------
+
+/** Résultat d'un changement de priorité renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatChangementPriorite = ResultatAction<{ priorite: Priorite; modifiee: boolean }>;
+
+/** Résultat d'un changement de catégorie renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatChangementCategorie = ResultatAction<{ categorieId: string; modifiee: boolean }>;
+
+/**
+ * Refus « attendus » d'un changement de priorité ou de catégorie : le détail
+ * est rafraîchi (la liste reprend la vraie valeur). Erreur inattendue : rien
+ * ne change à l'écran.
+ */
+function refusChangement(code: CodeErreur) {
+  switch (code) {
+    case "DEMANDE_INTROUVABLE":
+    case "DROIT_INSUFFISANT":
+    case "DONNEES_INVALIDES":
+    case "CATEGORIE_INVALIDE":
+      refresh();
+      return refusTraitement(code);
+    default:
+      // Jamais le détail technique vers le navigateur.
+      return refusTraitement(code);
+  }
+}
+
+/** Lit `modifiee` et la valeur renvoyée par la fonction SQL, ou null. */
+function lireChangement(donnees: unknown, cle: string): { valeur: unknown; modifiee: boolean } | null {
+  if (typeof donnees !== "object" || donnees === null) return null;
+  const v = donnees as Record<string, unknown>;
+  if (typeof v.modifiee !== "boolean") return null;
+  return { valeur: v[cle], modifiee: v.modifiee };
+}
+
+/**
+ * Priorité d'une demande (`changer_priorite`), quel que soit son statut
+ * (règle 3). Priorité hors liste : `DONNEES_INVALIDES` sans appel à la base.
+ * Même valeur qu'avant : succès sans modification (`modifiee: false`).
+ * Réussite ou refus attendu : le détail est rafraîchi.
+ */
+export async function changerPriorite(
+  demandeId: unknown,
+  priorite: unknown,
+): Promise<ResultatChangementPriorite> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+  const demande = schemaPrioriteDemande.safeParse(priorite);
+  if (!demande.success) return refusTraitement("DONNEES_INVALIDES");
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[changerPriorite] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "changer_priorite", {
+    p_demande_id: identifiant.data,
+    p_priorite: demande.data,
+  });
+  if (!resultat.ok) return refusChangement(resultat.code);
+
+  const changement = lireChangement(resultat.donnees, "priorite");
+  if (!changement || !(PRIORITES as readonly unknown[]).includes(changement.valeur)) {
+    console.error("[changerPriorite] réponse inattendue de changer_priorite");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return {
+    ok: true,
+    donnees: { priorite: changement.valeur as Priorite, modifiee: changement.modifiee },
+  };
+}
+
+/**
+ * Catégorie d'une demande (`changer_categorie`), quel que soit son statut :
+ * seulement une catégorie active (la base le vérifie). Identifiant mal formé :
+ * `CATEGORIE_INVALIDE` sans appel à la base. Même valeur qu'avant : succès
+ * sans modification. Réussite ou refus attendu : le détail est rafraîchi.
+ */
+export async function changerCategorie(
+  demandeId: unknown,
+  categorieId: unknown,
+): Promise<ResultatChangementCategorie> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+  const categorie = schemaIdentifiantCategorie.safeParse(categorieId);
+  if (!categorie.success) return refusTraitement("CATEGORIE_INVALIDE");
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[changerCategorie] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "changer_categorie", {
+    p_demande_id: identifiant.data,
+    p_categorie_id: categorie.data,
+  });
+  if (!resultat.ok) return refusChangement(resultat.code);
+
+  const changement = lireChangement(resultat.donnees, "categorie_id");
+  if (!changement || typeof changement.valeur !== "string") {
+    console.error("[changerCategorie] réponse inattendue de changer_categorie");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: { categorieId: changement.valeur, modifiee: changement.modifiee } };
 }

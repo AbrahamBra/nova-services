@@ -89,3 +89,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-1-mettre-en-ligne.md`
   summary: Vérifier en CI que l'étiquette `vX.Y.Z` d'une mise en ligne est égale à la version de `package.json`.
   evidence: Règle écrite dans `docs/exploitation/deploiement.md`, appliquée à la main pour l'instant.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-4-priorite-et-categorie.md`
+  summary: Sur ordinateur, les toasts en bas à droite recouvrent la liste Catégorie du panneau d'actions pendant 5 secondes.
+  evidence: capture de la vérification à l'écran (1280 × 720) : deux toasts empilés masquent la liste juste après un changement ; placement conforme à EXPERIENCE.md, à revoir (décalage ou une seule ligne).
