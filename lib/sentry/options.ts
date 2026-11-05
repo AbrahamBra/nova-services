@@ -10,8 +10,13 @@ type TransactionEvent = Parameters<NonNullable<OptionsInit["beforeSendTransactio
 // vérifié par tests/story-3-3/options-sentry.test.ts.
 // Pas d'import `server-only` : ce fichier est aussi chargé par le navigateur.
 
-/** Intégrations interdites (pas d'enregistrement de session, AD-14). */
-const INTEGRATIONS_INTERDITES = new Set(["Replay", "ReplayCanvas"]);
+/**
+ * Intégrations interdites (pas d'enregistrement de session, AD-14).
+ * BrowserSession : depuis que la version est injectée (story 3.1), le SDK
+ * enverrait à Sentry un « suivi de session » à chaque visite, même sans
+ * erreur. Seules les erreurs partent.
+ */
+const INTEGRATIONS_INTERDITES = new Set(["Replay", "ReplayCanvas", "BrowserSession"]);
 
 /** Coupe tout ce qui suit `?` ou `#` dans une adresse (paramètres, fragment). */
 export function sansParametres(adresse: string): string {

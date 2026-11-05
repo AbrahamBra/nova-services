@@ -44,7 +44,7 @@ Dans tous les cas, donnez : ce que vous faisiez, ce que vous avez vu (message ex
 | Un collaborateur voit ou fait une action d'administration (faille) | 2 | Responsable technique | 2 heures ouvrées | Téléphone |
 | Un mot de passe ou une clé a été écrit, envoyé ou montré par erreur (fuite) | 2 | Responsable technique | 2 heures ouvrées | Téléphone, puis voir [securite.md](securite.md#si-un-secret-a-fuité) |
 | Tâche « Réveil » ou « Sauvegarde nocturne » rouge sur GitHub | 2 | Responsable technique | 2 jours ouvrés | Email |
-| Alerte du suivi des erreurs (À compléter (story 3.3)) | 2 | Responsable technique | 2 jours ouvrés, 2 heures ouvrées si l'application est bloquée | Email (l'alerte arrive directement au responsable technique) |
+| Email d'alerte de Sentry (nouvelle erreur de l'application) | 2 | Responsable technique | 2 jours ouvrés, 2 heures ouvrées si l'application est bloquée | Email (l'alerte arrive directement au responsable technique) |
 
 Si l'administrateur ne sait pas résoudre un problème de niveau 1, il le transmet au niveau 2 par email.
 

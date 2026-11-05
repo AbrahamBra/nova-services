@@ -1,0 +1,13 @@
+# Réglages Netlify de Nova Services (story 3.1, AD-11).
+# Aucun secret ici : ce fichier est public. Les variables (clés Supabase,
+# HMAC_SECRET, DSN Sentry, NETLIFY_NEXT_SKEW_PROTECTION…) sont saisies dans
+# Netlify, par contexte (voir docs/exploitation/deploiement.md).
+# Branche de production : main (réglée dans Netlify, Build & deploy →
+# Branches and deploy contexts).
+
+[build]
+  # Vérifications rapides sans base (lint, typage), puis construction.
+  command = "npm run verifier && npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"

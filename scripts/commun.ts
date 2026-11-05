@@ -3,30 +3,21 @@
 // pour réutiliser lib/server/supabase-service.ts, seul endroit qui lit la clé
 // secrète (AD-9).
 
-import nextEnv from "@next/env";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { creerClientService } from "../lib/server/supabase-service.ts";
+import { chargerEnvironnement } from "./charger-environnement.mjs";
 
-/** Charge .env.local, puis refuse tout autre projet que celui de développement. */
-export function preparerEnvironnement(nomScript: string): void {
-  nextEnv.loadEnvConfig(process.cwd(), true, { info: () => {}, error: console.error });
-
-  if (process.argv.includes("--production")) {
-    console.error(
-      `${nomScript} : l'option --production n'est pas encore disponible (story 3.1, mise en ligne).`,
-    );
-    process.exit(1);
-  }
-
-  const environnement = process.env.SUPABASE_ENVIRONNEMENT;
-  if (environnement !== "developpement") {
-    console.error(
-      `${nomScript} refusé : SUPABASE_ENVIRONNEMENT vaut ${
-        environnement ? `« ${environnement} »` : "(absent)"
-      } au lieu de « developpement ». Vérifiez .env.local.`,
-    );
-    process.exit(1);
-  }
+/**
+ * Charge l'environnement du script (scripts/charger-environnement.mjs) :
+ * .env.local pour le projet de développement, ou, avec --production et
+ * seulement si `productionPermise`, .env.scripts-production.local pour la
+ * production (story 3.1). Arrête le script au moindre doute.
+ */
+export function preparerEnvironnement(
+  nomScript: string,
+  { productionPermise = false }: { productionPermise?: boolean } = {},
+): "developpement" | "production" {
+  return chargerEnvironnement(nomScript, { productionPermise });
 }
 
 export function clientService(): SupabaseClient {
@@ -38,7 +29,7 @@ export function clientPubliable(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const cle = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !cle) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY manquant dans .env.local.");
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY manquant dans le fichier d'environnement.");
   }
   return createClient(url, cle, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },

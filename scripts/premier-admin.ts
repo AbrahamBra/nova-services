@@ -2,9 +2,12 @@
 // À lancer par Abraham lui-même, dans un terminal :
 //   npm run admin:creer
 // Le script demande le nom, l'email et le mot de passe (saisie masquée).
-// Rien n'est écrit dans le code ni affiché. Refusé hors du projet de
-// développement (la production viendra avec la story 3.1), et refusé si un
-// administrateur actif existe déjà (le compte TEST-Admin compte aussi) :
+// Rien n'est écrit dans le code ni affiché. Vise le projet de développement
+// (.env.local), ou la production avec --production (story 3.1) :
+//   npm run admin:creer -- --production
+// qui lit UNIQUEMENT .env.scripts-production.local (SUPABASE_ENVIRONNEMENT=production).
+// Refusé si un administrateur actif existe déjà (en développement, le compte
+// TEST-Admin compte aussi) :
 //   npm run admin:creer -- --encore   pour en créer un autre malgré tout.
 
 import { createInterface } from "node:readline/promises";
@@ -12,7 +15,7 @@ import { clientService, codeErreur, FORMAT_EMAIL, preparerEnvironnement } from "
 
 const LONGUEUR_MIN_MOT_DE_PASSE = 8;
 
-preparerEnvironnement("premier-admin");
+const environnement = preparerEnvironnement("premier-admin", { productionPermise: true });
 
 if (!process.stdin.isTTY) {
   console.error("Lancez ce script dans un terminal : le mot de passe doit être saisi au clavier.");
@@ -65,7 +68,11 @@ function questionMasquee(libelle: string): Promise<string> {
 }
 
 async function principal() {
-  console.log("Création du premier administrateur (projet de développement).");
+  console.log(
+    environnement === "production"
+      ? "Création du premier administrateur (projet de PRODUCTION)."
+      : "Création du premier administrateur (projet de développement).",
+  );
 
   const client = clientService();
 

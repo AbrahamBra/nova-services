@@ -13,6 +13,8 @@ import { ENTETE_CHEMIN } from "@/lib/supabase/proxy";
 // connectée est un membre actif (lu dans `membres`, AD-3), puis affiche le
 // menu latéral. Sans session, proxy.ts a déjà renvoyé vers la connexion.
 // Story 2.1 : fournisseur des toasts, commun à toutes les actions.
+// Story 3.1 : version de l'application en bas de chaque page interne
+// (AD-11), injectée au build par next.config.ts.
 // Jamais mise en cache.
 export const dynamic = "force-dynamic";
 
@@ -50,7 +52,14 @@ export default async function MiseEnPageEquipe({ children }: LayoutProps<"/equip
     <FournisseurToasts>
       <div className="flex min-h-full flex-1 flex-col lg:flex-row">
         <MenuEquipe nom={nom} libelleRole={LIBELLES_ROLE[role]} estAdmin={estAdmin} />
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
+          <footer className="px-4 pb-4 text-[13px] text-muted-foreground md:px-8">
+            {process.env.NEXT_PUBLIC_APP_VERSION
+              ? `Version ${process.env.NEXT_PUBLIC_APP_VERSION}`
+              : "Version inconnue"}
+          </footer>
+        </div>
       </div>
     </FournisseurToasts>
   );

@@ -1,41 +1,34 @@
-// Applique les migrations de supabase/migrations/ sur la base désignée par
-// SUPABASE_DB_URL (lue dans .env.local), avec la CLI Supabase :
+// Applique les migrations de supabase/migrations/ avec la CLI Supabase :
 //   supabase db push --db-url <SUPABASE_DB_URL>
+//   npm run db:push                    projet de développement (.env.local)
+//   npm run db:push -- --production    production : lit UNIQUEMENT
+//                                      .env.scripts-production.local (story 3.1)
+// Voir scripts/charger-environnement.mjs pour les garde-fous.
 // L'adresse n'est jamais affichée : elle contient le mot de passe de la base.
 
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import nextEnv from "@next/env";
+import { chargerEnvironnement, FICHIER_PRODUCTION, OPTION_PRODUCTION } from "./charger-environnement.mjs";
 
 const require = createRequire(import.meta.url);
 
-nextEnv.loadEnvConfig(process.cwd(), true, { info: () => {}, error: console.error });
+const environnement = chargerEnvironnement("db:push", { productionPermise: true });
+const fichier = environnement === "production" ? FICHIER_PRODUCTION : ".env.local";
 
 const url = process.env.SUPABASE_DB_URL;
 if (!url) {
   console.error(
-    "SUPABASE_DB_URL manquant : renseignez l'adresse de connexion de la base dans .env.local.",
+    `SUPABASE_DB_URL manquant : renseignez l'adresse de connexion de la base dans ${fichier}.`,
   );
   process.exit(1);
 }
 
-// Garde-fou : seul le projet de développement est accepté, sauf demande
-// explicite avec --production.
-const args = process.argv.slice(2);
-const production = args.includes("--production");
-const argsCli = args.filter((arg) => arg !== "--production");
-const environnement = process.env.SUPABASE_ENVIRONNEMENT;
-if (environnement !== "developpement" && !production) {
-  console.error(
-    `Migrations refusées : SUPABASE_ENVIRONNEMENT vaut ${
-      environnement ? `« ${environnement} »` : "(absent)"
-    } au lieu de « developpement ». Pour viser volontairement une autre base, ajoutez --production (npm run db:push -- --production).`,
-  );
-  process.exit(1);
-}
+const argsCli = process.argv.slice(2).filter((arg) => arg !== OPTION_PRODUCTION);
 
 console.log(
-  `Application des migrations sur le projet « ${environnement ?? "environnement non précisé"} »…`,
+  environnement === "production"
+    ? `Application des migrations sur le projet de PRODUCTION (${FICHIER_PRODUCTION})…`
+    : "Application des migrations sur le projet « developpement »…",
 );
 
 // Appel direct de la CLI (sans shell) : les caractères spéciaux du mot de
