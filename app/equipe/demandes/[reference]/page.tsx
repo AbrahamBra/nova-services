@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BoutonPrendreEnCharge } from "@/components/nova/actions-demande";
 import { BadgePriorite, BadgeStatut } from "@/components/nova/badges";
 import { Historique } from "@/components/nova/historique";
+import { FormulaireNote, ListeNotes } from "@/components/nova/notes";
 import { BoutonReessayer } from "@/components/nova/reessayer";
 import { lireDetail, type DetailDemande } from "@/lib/detail-demande";
 import { LIBELLES_CANAL, type EtatEmail } from "@/lib/domaine";
@@ -15,8 +16,9 @@ import { formaterDateHeure } from "@/lib/format";
 // l'email de confirmation n'est pas parti, historique, et panneau d'actions
 // à droite (en dessous sur téléphone) : responsable, statut, priorité,
 // catégorie. Story 2.1 : « Prendre en charge » si la demande est Nouvelle
-// et sans responsable.
-// Les autres actions et les notes internes arrivent avec l'epic 2.
+// et sans responsable. Story 2.2 : bloc « Notes internes », entre Demandeur
+// et Historique (liste et ajout, quel que soit le statut).
+// Les autres actions arrivent avec l'epic 2.
 // Lu avec la session de la personne connectée (RLS), jamais mis en cache.
 export const dynamic = "force-dynamic";
 
@@ -170,6 +172,15 @@ function Detail({ demande }: { demande: DetailDemande }) {
                 {bandeauEmail}
               </p>
             ) : null}
+          </Carte>
+
+          <Carte titre="Notes internes">
+            <ListeNotes
+              notes={demande.notes}
+              notesIllisibles={demande.notesIllisibles}
+              nomsMembres={demande.nomsMembres}
+            />
+            <FormulaireNote demandeId={demande.id} />
           </Carte>
 
           <Carte titre="Historique">

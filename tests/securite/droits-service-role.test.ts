@@ -21,6 +21,8 @@ const TABLES = [
   // Story 1.9 : tentatives de connexion, écrites seulement par
   // commencer_connexion et terminer_connexion.
   "tentatives_connexion",
+  // Story 2.2 : notes internes, écrites seulement par ajouter_note.
+  "notes",
 ];
 const DROITS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
 
@@ -65,12 +67,13 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows.map((ligne) => ligne.droit)).toEqual([]);
   });
 
-  it("aucun usage direct des séquences de l'historique, du journal, des envois et des tentatives", async () => {
+  it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",
       "public.journal_id_seq",
       "public.envois_formulaire_id_seq",
       "public.tentatives_connexion_id_seq",
+      "public.notes_id_seq",
     ]) {
       const { rows } = await client.query<{ peut: boolean }>(
         `select has_sequence_privilege('service_role', $1, 'USAGE')

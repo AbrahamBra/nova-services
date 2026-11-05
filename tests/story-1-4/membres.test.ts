@@ -348,7 +348,7 @@ describe("table membres — contraintes", () => {
     expect(droits.rows).toEqual([]);
   });
 
-  it("demandes.responsable_id, demandes.saisie_par_id, historique.auteur_id et journal.auteur_id pointent vers membres", async () => {
+  it("demandes.responsable_id, demandes.saisie_par_id, historique.auteur_id, journal.auteur_id et notes.auteur_id pointent vers membres", async () => {
     const { rows } = await base.query<{ colonne: string }>(
       `select c.conrelid::regclass::text || '.' || a.attname as colonne
          from pg_constraint c
@@ -362,6 +362,8 @@ describe("table membres — contraintes", () => {
       "historique.auteur_id",
       // Story 1.7 : auteur (membre) d'une ligne du journal.
       "journal.auteur_id",
+      // Story 2.2 : auteur (membre) d'une note interne.
+      "notes.auteur_id",
     ]);
   });
 

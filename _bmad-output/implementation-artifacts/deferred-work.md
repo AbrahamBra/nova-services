@@ -56,3 +56,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-9-securiser-la-connexion.md`
   summary: Ajouter `tentatives_connexion` (plus d'un jour) et `envois_formulaire` (plus d'une heure) à `purger_technique`.
   evidence: l'effacement n'a lieu qu'à la connexion ou au dépôt suivant (AD-23).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-2-ajouter-une-note.md`
+  summary: Le refus du serveur dans le formulaire de note (et le bouton de prise en charge) n'est pas testé à l'écran.
+  evidence: aucun test ne fait renvoyer `ok: false` à l'action depuis un composant client ; il faudrait un montage de test de composant (Testing Library) ou un refus forcé en e2e.

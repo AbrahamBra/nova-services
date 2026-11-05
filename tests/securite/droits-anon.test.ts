@@ -21,6 +21,8 @@ import { Client } from "pg";
 // et les utilitaires prive de comptage, aucun droit (rien à ajouter).
 // Story 2.1 : prendre_en_charge pour le membre connecté (la fonction vérifie
 // elle-même qu'il est actif) ; rien pour anon.
+// Story 2.2 : ajouter_note pour le membre connecté, et lecture de `notes`
+// colonne par colonne (aucune écriture directe) ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -30,9 +32,11 @@ const COLONNES_HISTORIQUE = [
   "id", "demande_id", "auteur_type", "auteur_id", "type", "ancienne_valeur", "nouvelle_valeur",
   "cree_le",
 ];
+const COLONNES_NOTES = ["id", "demande_id", "auteur_id", "texte", "cree_le"];
 const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
+  "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
   "authenticated:table:public.demandes_liste:SELECT",
@@ -40,6 +44,7 @@ const DROITS_ATTENDUS: string[] = [
   ...["id", "nom", "etat"].map((c) => `authenticated:colonne:public.membres.${c}:SELECT`),
   ...["id", "nom", "actif"].map((c) => `authenticated:colonne:public.categories.${c}:SELECT`),
   ...COLONNES_HISTORIQUE.map((c) => `authenticated:colonne:public.historique.${c}:SELECT`),
+  ...COLONNES_NOTES.map((c) => `authenticated:colonne:public.notes.${c}:SELECT`),
 ].sort();
 
 const ROLES = ["anon", "authenticated"];

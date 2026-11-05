@@ -12,7 +12,10 @@
 --     jean.dupont@example.com ;
 --   - des demandes traitées il y a plus de 2 ans, et une demande rouverte
 --     puis traitée récemment ;
---   - une ligne d'historique `creation` pour chaque demande.
+--   - une ligne d'historique `creation` pour chaque demande ;
+--   - quelques notes internes (story 2.2), chacune avec sa ligne
+--     d'historique `note_ajoutee` (sans le texte), dont une sur plusieurs
+--     lignes et une avec du code (affiché tel quel).
 --
 -- Les références sont prises au compteur de l'année (heure de Paris), comme
 -- pour une vraie demande : aucun conflit possible avec les vraies références,
@@ -30,6 +33,7 @@ declare
   v_admin    uuid;
   v_collab   uuid;
   r          record;
+  n          record;
   v_cree_le  timestamptz;
   v_traitee  timestamptz;
   v_resp     uuid;
@@ -251,6 +255,39 @@ begin
         (v_id, 'membre', v_admin, 'changement_statut', 'en_cours', 'traitee',
          now() - interval '1 day');
     end if;
+
+    -- Notes internes (story 2.2) : la note et sa ligne d'historique, à la
+    -- même date. Jamais le texte dans l'historique (AD-19).
+    for n in
+      select *
+        from (values
+          ('TEST-Imprimante réseau hors ligne', 'A',
+           'Rappelée à 9 h, intervention à distance prévue.', interval '1 hour'),
+          ('TEST-Imprimante réseau hors ligne', 'C',
+           E'Pilote réinstallé.\nL''imprimante répond de nouveau au ping.\nÀ confirmer avec la cliente.',
+           interval '3 hours'),
+          ('TEST-Sauvegarde automatique en échec', 'C',
+           'Disque de sauvegarde plein : commande d''un disque de 4 To.', interval '1 day'),
+          ('TEST-Serveur de fichiers lent (rouverte)', 'A',
+           'Rouverte à la demande de la cliente : lenteurs revenues le matin.', interval '35 days'),
+          ('TEST-Message avec du code dans la description', 'C',
+           E'Le client a recopié <b>ce code</b> :\n<script>alert(''note'')</script>',
+           interval '2 hours'),
+          ('TEST-Facture de septembre incomplète', 'C',
+           'Facture corrigée envoyée par email.', interval '1 day')
+        ) as t(objet, auteur, texte, apres)
+       where t.objet = r.objet
+    loop
+      insert into public.notes (demande_id, auteur_id, texte, cree_le)
+      values (v_id,
+              case n.auteur when 'A' then v_admin else v_collab end,
+              n.texte, v_cree_le + n.apres);
+      insert into public.historique
+        (demande_id, auteur_type, auteur_id, type, cree_le)
+      values
+        (v_id, 'membre', case n.auteur when 'A' then v_admin else v_collab end,
+         'note_ajoutee', v_cree_le + n.apres);
+    end loop;
 
     v_nb := v_nb + 1;
   end loop;
