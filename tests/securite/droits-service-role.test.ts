@@ -67,6 +67,17 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows.map((ligne) => ligne.droit)).toEqual([]);
   });
 
+  // Story 2.5 : la recherche est réservée aux membres connectés ; la colonne
+  // `demandes.recherche` est couverte par le test des colonnes ci-dessus.
+  it("aucun droit sur rechercher_demandes, ids_demandes_recherche ni prive.normaliser", async () => {
+    const { rows } = await client.query<{ fonction: string }>(
+      `select f.fonction
+       from unnest(array['public.rechercher_demandes(text)', 'public.ids_demandes_recherche(text)', 'prive.normaliser(text)']) as f(fonction)
+       where has_function_privilege('service_role', f.fonction, 'EXECUTE')`,
+    );
+    expect(rows.map((ligne) => ligne.fonction)).toEqual([]);
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",
