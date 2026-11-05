@@ -51,8 +51,8 @@ type Props = {
 
 // Apparence Nova des champs shadcn (enveloppés, jamais modifiés) :
 // coins 6 px, fond blanc, 44 px de haut, texte 15 px.
-const CLASSE_CHAMP = "h-11 rounded-md bg-surface px-3 text-[15px] md:text-[15px]";
-const CLASSE_LIBELLE = "text-sm font-medium leading-[1.4]";
+export const CLASSE_CHAMP = "h-11 rounded-md bg-surface px-3 text-[15px] md:text-[15px]";
+export const CLASSE_LIBELLE = "text-sm font-medium leading-[1.4]";
 
 /**
  * Appel de l'action serveur. Une coupure réseau (requête qui n'aboutit pas)
@@ -72,12 +72,12 @@ async function envoyerAuServeur(etat: EtatDepot, donnees: FormData): Promise<Eta
   }
 }
 
-function Facultatif() {
+export function Facultatif() {
   return <span className="font-normal text-muted-foreground">(facultatif)</span>;
 }
 
 /** Message sous le champ, annoncé par les lecteurs d'écran (zone toujours présente). */
-function MessageErreur({ id, message, decale = false }: { id: string; message?: string; decale?: boolean }) {
+export function MessageErreur({ id, message, decale = false }: { id: string; message?: string; decale?: boolean }) {
   return (
     <div id={id} aria-live="polite">
       {message ? (

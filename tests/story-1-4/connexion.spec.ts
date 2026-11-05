@@ -106,8 +106,8 @@ test.describe("connexion à l'espace équipe", () => {
     await expect(menu(page).getByRole("heading", { name: "Administration" })).toBeVisible();
     await expect(menu(page).getByText(admin.nom, { exact: true })).toBeVisible();
     await expect(menu(page).getByText("Administrateur", { exact: true })).toBeVisible();
-    // Story 1.5 : Accueil, Demandes et Vue d'ensemble.
-    await expect(menu(page).getByRole("link")).toHaveCount(3);
+    // Story 1.5 : Accueil, Demandes et Vue d'ensemble ; story 2.6 : Saisir une demande.
+    await expect(menu(page).getByRole("link")).toHaveCount(4);
     await sansViolationAxe(page);
 
     // Zone administrateur ouverte à l'administrateur.
@@ -167,8 +167,8 @@ test.describe("connexion à l'espace équipe", () => {
     await ouvrirMenuSiReplie(page);
     await expect(menu(page).getByText("Collaborateur", { exact: true })).toBeVisible();
     await expect(menu(page).getByRole("heading", { name: "Administration" })).toHaveCount(0);
-    // Story 1.5 : Accueil et Demandes.
-    await expect(menu(page).getByRole("link")).toHaveCount(2);
+    // Story 1.5 : Accueil et Demandes ; story 2.6 : Saisir une demande.
+    await expect(menu(page).getByRole("link")).toHaveCount(3);
 
     // L'administration est refusée au collaborateur.
     await page.goto("/equipe/admin");

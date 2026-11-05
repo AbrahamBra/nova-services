@@ -27,6 +27,11 @@ import {
   verifierRaisonClassement,
   verifierTexteNote,
 } from "@/lib/schemas/traitement";
+import {
+  lireSaisie,
+  verifierSaisie,
+  type EtatSaisie,
+} from "@/lib/schemas/saisie";
 import { PRIORITES, STATUTS, type Priorite, type Statut } from "@/lib/domaine";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
@@ -35,7 +40,8 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 // d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base) ;
 // story 2.1 : prise en charge (traitement, avec la session du membre) ;
 // story 2.2 : notes internes ; story 2.3 : changement de statut et
-// classement sans suite ; story 2.4 : priorité et catégorie.
+// classement sans suite ; story 2.4 : priorité et catégorie ; story 2.6 :
+// saisie interne d'une demande reçue par téléphone ou par email.
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -81,6 +87,7 @@ async function noterResultatEmail(
   demandeId: string,
   etat: string,
   code: string | null,
+  origine = "deposer",
 ): Promise<void> {
   const notation = await appeler<unknown>(client, "noter_resultat_email", {
     p_demande_id: demandeId,
@@ -88,7 +95,7 @@ async function noterResultatEmail(
     p_code_erreur: code,
   });
   if (!notation.ok) {
-    console.error(`[deposer] résultat de l'email non noté : code=${notation.code}`);
+    console.error(`[${origine}] résultat de l'email non noté : code=${notation.code}`);
   }
 }
 
@@ -103,6 +110,7 @@ async function envoyerEmailConfirmation(
   destinataire: string,
   reference: string,
   donnees: DonneesEmailDepot,
+  origine = "deposer",
 ): Promise<void> {
   try {
     const { etat, code } = await envoyerConfirmation(destinataire, {
@@ -114,14 +122,14 @@ async function envoyerEmailConfirmation(
       emailContact: donnees.email_contact,
     });
     if (etat === "echec") {
-      console.error(`[deposer] email de confirmation non envoyé : code=${code ?? "inconnu"}`);
+      console.error(`[${origine}] email de confirmation non envoyé : code=${code ?? "inconnu"}`);
       // Envoi simultané avec la même clé d'idempotence (double clic) : l'autre
       // appel envoie l'email et note le résultat.
       if (code === "concurrent_idempotent_requests") return;
     }
-    await noterResultatEmail(client, donnees.id, etat, code);
+    await noterResultatEmail(client, donnees.id, etat, code, origine);
   } catch {
-    console.error("[deposer] exception pendant l'envoi de l'email de confirmation");
+    console.error(`[${origine}] exception pendant l'envoi de l'email de confirmation`);
   }
 }
 
@@ -624,4 +632,125 @@ export async function changerCategorie(
 
   refresh();
   return { ok: true, donnees: { categorieId: changement.valeur, modifiee: changement.modifiee } };
+}
+
+// --- Saisie interne (story 2.6) ----------------------------------------------
+
+function erreurSaisie(etat: EtatSaisie, message: string): EtatSaisie {
+  return { erreurs: {}, erreurGenerale: message, tentative: etat.tentative + 1, reference: null };
+}
+
+const FORMAT_REFERENCE = /^NOVA-\d{4}-\d{4,}$/;
+
+/**
+ * Saisie interne d'une demande reçue par téléphone ou par email (FR-25) :
+ * Zod (schéma partagé avec l'écran, AD-8) → `saisir_demande` avec la SESSION
+ * du membre (la base vérifie qu'il est actif, AD-4) → si un email est
+ * renseigné, email de confirmation puis `noter_resultat_email` (clé secrète,
+ * comme `deposer` : fonction réservée à service_role), mode démonstration
+ * compris (AD-13). Renvoie la référence ; l'écran affiche le toast et ouvre
+ * le détail. Erreurs : messages sous les champs, ou bandeau ; la saisie
+ * reste dans le formulaire. L'email ne fait jamais échouer la saisie.
+ * Pas de limite d'envois (réservé aux membres connectés).
+ */
+export async function saisir(etat: EtatSaisie, formulaire: FormData): Promise<EtatSaisie> {
+  const verification = verifierSaisie(lireSaisie(formulaire));
+  if (!verification.ok) {
+    // Clé falsifiée : les messages sous les champs ne la corrigeraient pas.
+    if (verification.cleInvalide && Object.keys(verification.erreurs).length === 0) {
+      return erreurSaisie(etat, messageErreur("DONNEES_INVALIDES"));
+    }
+    return {
+      erreurs: verification.erreurs,
+      erreurGenerale: null,
+      tentative: etat.tentative + 1,
+      reference: null,
+    };
+  }
+
+  const d = verification.donnees;
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[saisir] client serveur indisponible");
+    return erreurSaisie(etat, messageErreur("ERREUR_INATTENDUE"));
+  }
+
+  const resultat = await appeler<unknown>(client, "saisir_demande", {
+    p_cle_envoi: d.cle_envoi,
+    p_canal: d.canal,
+    p_nom: d.nom,
+    p_email: d.email,
+    p_telephone: d.telephone,
+    p_societe: d.societe,
+    p_categorie_id: d.categorie_id,
+    p_objet: d.objet,
+    p_description: d.description,
+  });
+
+  if (!resultat.ok) {
+    const sousLeChamp = (champ: "email" | "categorie_id"): EtatSaisie => ({
+      erreurs: { [champ]: resultat.message },
+      erreurGenerale: null,
+      tentative: etat.tentative + 1,
+      reference: null,
+    });
+    switch (resultat.code) {
+      case "COORDONNEES_REQUISES":
+        return sousLeChamp("email");
+      case "CATEGORIE_INVALIDE":
+        return sousLeChamp("categorie_id");
+      case "DROIT_INSUFFISANT":
+        // Comme les autres actions : la page est rafraîchie (un membre
+        // désactivé est renvoyé à la connexion par la mise en page).
+        refresh();
+        return erreurSaisie(etat, resultat.message);
+      default:
+        // DONNEES_INVALIDES, ERREUR_INATTENDUE : bandeau.
+        return erreurSaisie(etat, resultat.message);
+    }
+  }
+
+  const reference = (resultat.donnees as Record<string, unknown> | null)?.reference;
+  if (typeof reference !== "string" || !FORMAT_REFERENCE.test(reference)) {
+    console.error("[saisir] réponse inattendue de saisir_demande");
+    return erreurSaisie(etat, messageErreur("ERREUR_INATTENDUE"));
+  }
+
+  // Email seulement si une adresse est ENREGISTRÉE (réponse de la base, pas
+  // le formulaire, qui peut avoir changé lors d'un second envoi), pour une
+  // demande nouvelle ou encore `en_attente`. Sans email, la base a noté
+  // `sans_email`.
+  const donneesEmail = lireDonneesEmail(resultat.donnees);
+  const brut = resultat.donnees as Record<string, unknown>;
+  const emailEnregistre = typeof brut.email === "string" && brut.email !== "" ? brut.email : null;
+  const aEnvoyer =
+    donneesEmail === null ||
+    (emailEnregistre !== null && (donneesEmail.nouvelle || donneesEmail.etat_email === "en_attente"));
+  if (aEnvoyer) {
+    let service: ClientRpc | null = null;
+    try {
+      service = creerClientService();
+    } catch {
+      // L'email reste `en_attente` ; la saisie est enregistrée.
+      console.error("[saisir] client service indisponible : email non envoyé");
+    }
+    if (service) {
+      if (donneesEmail === null) {
+        console.error("[saisir] données de l'email absentes de la réponse de saisir_demande");
+        if (typeof brut.id === "string") {
+          await noterResultatEmail(service, brut.id, "echec", "donnees_absentes", "saisir");
+        }
+      } else if (emailEnregistre !== null) {
+        // Adresse telle que saisie (sans espaces), si elle correspond à l'adresse enregistrée.
+        const saisie = String(formulaire.get("email") ?? "").trim();
+        const destinataire = saisie.toLowerCase() === emailEnregistre ? saisie : emailEnregistre;
+        await envoyerEmailConfirmation(service, destinataire, reference, donneesEmail, "saisir");
+      }
+    }
+  }
+
+  return { erreurs: {}, erreurGenerale: null, tentative: etat.tentative + 1, reference };
 }

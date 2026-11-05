@@ -78,6 +78,17 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows.map((ligne) => ligne.fonction)).toEqual([]);
   });
 
+  // Story 2.6 : la saisie interne est réservée aux membres connectés (session),
+  // jamais à la clé secrète.
+  it("aucun droit sur saisir_demande", async () => {
+    const { rows } = await client.query<{ peut: boolean }>(
+      `select has_function_privilege('service_role',
+         'public.saisir_demande(uuid, text, text, text, text, text, uuid, text, text)',
+         'EXECUTE') as peut`,
+    );
+    expect(rows[0].peut).toBe(false);
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

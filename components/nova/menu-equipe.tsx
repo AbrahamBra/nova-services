@@ -17,6 +17,8 @@ type Rubrique = { libelle: string; adresse: string };
 const RUBRIQUES: Rubrique[] = [
   { libelle: "Accueil", adresse: "/equipe" },
   { libelle: "Demandes", adresse: "/equipe/demandes" },
+  // Story 2.6 : saisie interne.
+  { libelle: "Saisir une demande", adresse: "/equipe/demandes/nouvelle" },
 ];
 const RUBRIQUES_ADMIN: Rubrique[] = [{ libelle: "Vue d'ensemble", adresse: "/equipe/admin" }];
 
@@ -29,9 +31,21 @@ type Props = {
 const CLASSE_LIEN =
   "flex min-h-11 items-center rounded-md px-3 text-[15px] font-medium text-sidebar-foreground/85 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-white/70 aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-foreground";
 
-/** Rubrique active : sa page ou une de ses sous-pages (sauf l'accueil, exact). */
-function estActive(chemin: string, adresse: string): boolean {
+/** La page est-elle celle de la rubrique ou une de ses sous-pages (sauf l'accueil, exact) ? */
+function correspond(chemin: string, adresse: string): boolean {
   return chemin === adresse || (adresse !== "/equipe" && chemin.startsWith(`${adresse}/`));
+}
+
+/**
+ * Rubrique active : la plus précise qui correspond à la page. Sur
+ * « Saisir une demande » (/equipe/demandes/nouvelle), seule cette rubrique
+ * est active, pas « Demandes ».
+ */
+function estActive(chemin: string, adresse: string): boolean {
+  if (!correspond(chemin, adresse)) return false;
+  return ![...RUBRIQUES, ...RUBRIQUES_ADMIN].some(
+    (autre) => autre.adresse.length > adresse.length && correspond(chemin, autre.adresse),
+  );
 }
 
 function Lien({ rubrique, actif }: { rubrique: Rubrique; actif: boolean }) {

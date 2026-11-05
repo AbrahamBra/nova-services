@@ -93,3 +93,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-4-priorite-et-categorie.md`
   summary: Sur ordinateur, les toasts en bas à droite recouvrent la liste Catégorie du panneau d'actions pendant 5 secondes.
   evidence: capture de la vérification à l'écran (1280 × 720) : deux toasts empilés masquent la liste juste après un changement ; placement conforme à EXPERIENCE.md, à revoir (décalage ou une seule ligne).
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-6-saisir-une-demande.md`
+  summary: `FormulaireSaisie` n'a pas de test de composant (synchronisation des réponses, effacement des erreurs, garde du double clic).
+  evidence: aucun banc de test de composants client dans le projet ; seul le navigateur couvre ce formulaire.

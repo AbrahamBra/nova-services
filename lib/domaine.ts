@@ -161,6 +161,19 @@ export const AVANT_AUTEUR_HISTORIQUE: Partial<Record<TypeHistorique, string>> = 
 };
 
 /**
+ * Début de phrase AVANT l'auteur pour une création par un membre (saisie
+ * interne, story 2.6) : « Saisie par Nadia Morel (téléphone) ». La création
+ * par le formulaire public garde « Demandeur (formulaire) a créé la demande ».
+ */
+export const AVANT_AUTEUR_SAISIE = "Saisie par ";
+
+/** Début de phrase placé avant l'auteur d'une ligne, ou "" (voir ci-dessus). */
+export function avantAuteurHistorique(type: TypeHistorique, auteurEstDemandeur: boolean): string {
+  if (type === "creation") return auteurEstDemandeur ? "" : AVANT_AUTEUR_SAISIE;
+  return AVANT_AUTEUR_HISTORIQUE[type] ?? "";
+}
+
+/**
  * Types dont le passage (« : Nouvelle → En cours ») est omis quand les
  * valeurs stockées ne sont pas des codes connus : anciennes lignes
  * `prise_en_charge` (identifiant du membre dans `nouvelle_valeur`), affichées
@@ -178,10 +191,10 @@ export const PHRASES_HISTORIQUE: Record<
 > = {
   creation: ({ nouvelle }, auteurEstDemandeur) => {
     if (auteurEstDemandeur) return "a créé la demande";
-    // Saisie interne ; canal absent ou inconnu : sans parenthèse.
-    return nouvelle
-      ? `a saisi la demande (${nouvelle.toLocaleLowerCase("fr-FR")})`
-      : "a saisi la demande";
+    // Saisie interne, auteur au milieu de la phrase (AVANT_AUTEUR_SAISIE) :
+    // « Saisie par Nadia Morel (téléphone) » ; canal absent ou inconnu :
+    // sans parenthèse.
+    return nouvelle ? `(${nouvelle.toLocaleLowerCase("fr-FR")})` : "";
   },
   // Auteur au milieu de la phrase (voir AVANT_AUTEUR_HISTORIQUE) :
   // « Prise en charge par Karim Benali : Nouvelle → En cours ».

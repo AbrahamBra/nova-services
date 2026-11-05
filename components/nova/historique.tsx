@@ -2,7 +2,7 @@ import type { LigneHistorique } from "@/lib/detail-demande";
 import {
   AUTEUR_DEMANDEUR,
   AUTEUR_INCONNU,
-  AVANT_AUTEUR_HISTORIQUE,
+  avantAuteurHistorique,
   CANAUX,
   LIBELLES_CANAL,
   LIBELLES_PRIORITE,
@@ -41,7 +41,7 @@ function traduire(
   if (valeur === null) return null;
   switch (nature) {
     case "canal":
-      // Canal inconnu : omis (« a saisi la demande »), jamais « (?) ».
+      // Canal inconnu : omis (« Saisie par Nadia Morel »), jamais « (?) ».
       return (CANAUX as readonly string[]).includes(valeur)
         ? LIBELLES_CANAL[valeur as (typeof CANAUX)[number]]
         : null;
@@ -92,7 +92,7 @@ export function texteLigneHistorique(
     valeurs = { ancienne: null, nouvelle: null };
   }
   const action = PHRASES_HISTORIQUE[ligne.type](valeurs, estDemandeur);
-  return { avant: AVANT_AUTEUR_HISTORIQUE[ligne.type] ?? "", auteur, action };
+  return { avant: avantAuteurHistorique(ligne.type, estDemandeur), auteur, action };
 }
 
 /** Phrase complète d'une ligne, telle qu'affichée. */

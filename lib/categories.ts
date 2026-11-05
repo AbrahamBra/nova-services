@@ -80,3 +80,31 @@ export async function lireCategoriesActives(
   }
   return lireCategoriesAvec(client, categorieId);
 }
+
+/**
+ * Catégories actives de la saisie interne (story 2.6), dans l'ordre des
+ * formulaires, lues avec la session de la personne connectée.
+ */
+export async function lireCategoriesSaisie(): Promise<Resultat<CategorieListe[]>> {
+  try {
+    const client = await creerClientServeur();
+    const { data, error } = await client
+      .from("categories")
+      .select("id, nom")
+      .eq("actif", true)
+      .order("ordre", { ascending: true })
+      .order("nom", { ascending: true });
+    if (error || !Array.isArray(data)) {
+      console.error(`[categories] lecture impossible : code=${error?.code ?? "aucun"}`);
+      return ECHEC;
+    }
+    const lignes = (data as unknown[]).filter((l): l is CategorieListe => {
+      const v = l as Record<string, unknown> | null;
+      return typeof v?.id === "string" && typeof v.nom === "string";
+    });
+    return { ok: true, donnees: lignes.map(({ id, nom }) => ({ id, nom })) };
+  } catch {
+    console.error("[categories] exception pendant la lecture");
+    return ECHEC;
+  }
+}
