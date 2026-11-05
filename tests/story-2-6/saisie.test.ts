@@ -354,7 +354,8 @@ describe("saisir_demande — cas de la matrice", () => {
       references.push(data.reference);
     }
     expect(new Set(references).size).toBe(10);
-  });
+    // Dix appels réseau à la suite : plus que les 5 s par défaut en CI.
+  }, 20_000);
 });
 
 describe("saisir_demande — compteur partagé avec le dépôt public (AD-6)", () => {
