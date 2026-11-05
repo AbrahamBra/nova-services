@@ -23,6 +23,8 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 // affichage (membres, catégories). Lu avec la SESSION de la personne
 // connectée (jamais la clé secrète) : RLS et droits par colonne font le tri.
 // `jeton_confirmation` et `cle_envoi` ne sont jamais demandés.
+// Story 2.2 : les notes internes (de la plus ancienne à la plus récente) et
+// le nom de leurs auteurs, lues de la même façon (RLS de `notes`).
 // Résultat : `donnees: null` si la référence est mal formée ou inconnue.
 
 export type LigneHistorique = {
@@ -33,6 +35,14 @@ export type LigneHistorique = {
   type: TypeHistorique;
   ancienneValeur: string | null;
   nouvelleValeur: string | null;
+};
+
+export type NoteInterne = {
+  id: string;
+  creeLe: string;
+  auteurId: string;
+  /** Texte tel que saisi (retours à la ligne compris), jamais interprété. */
+  texte: string;
 };
 
 export type DetailDemande = {
@@ -54,6 +64,9 @@ export type DetailDemande = {
   historique: LigneHistorique[];
   /** Lignes d'historique écartées par la validation (illisibles). */
   lignesIllisibles: number;
+  notes: NoteInterne[];
+  /** Notes écartées par la validation (illisibles). */
+  notesIllisibles: number;
   /** Noms des membres cités (responsable, auteurs, valeurs), par identifiant. */
   nomsMembres: Record<string, string>;
   /** Noms actuels des catégories citées, par identifiant (AD-19). */
@@ -70,6 +83,8 @@ const COLONNES_DEMANDE =
 
 const COLONNES_HISTORIQUE =
   "id, auteur_type, auteur_id, type, ancienne_valeur, nouvelle_valeur, cree_le";
+
+const COLONNES_NOTES = "id, auteur_id, texte, cree_le";
 
 const ECHEC = {
   ok: false,
@@ -147,15 +162,45 @@ export function lireLigneHistorique(valeur: unknown): LigneHistorique | null {
   };
 }
 
-/** Identifiants de membres et de catégories cités par la demande et son historique. */
+/**
+ * Valide une note interne. Une note invalide est écartée (`null`) et
+ * signalée au journal par son identifiant et le champ seulement (jamais le texte).
+ */
+export function lireNote(valeur: unknown): NoteInterne | null {
+  if (typeof valeur !== "object" || valeur === null) {
+    console.error("[detail] note écartée : forme inattendue");
+    return null;
+  }
+  const v = valeur as Record<string, unknown>;
+  const id = typeof v.id === "number" || typeof v.id === "string" ? String(v.id) : null;
+  let champ: string | null = null;
+  if (id === null) champ = "id";
+  else if (!texte(v.auteur_id)) champ = "auteur_id";
+  else if (!texte(v.texte)) champ = "texte";
+  else if (!date(v.cree_le)) champ = "cree_le";
+  if (champ !== null) {
+    console.error(`[detail] note écartée : id=${id ?? "inconnu"} champ=${champ}`);
+    return null;
+  }
+  return {
+    id: id!,
+    creeLe: v.cree_le as string,
+    auteurId: v.auteur_id as string,
+    texte: v.texte as string,
+  };
+}
+
+/** Identifiants de membres et de catégories cités par la demande, son historique et ses notes. */
 function identifiantsCites(
   responsableId: string | null,
   categorieId: string,
   historique: LigneHistorique[],
+  notes: NoteInterne[],
 ): { membres: string[]; categories: string[] } {
   const membres = new Set<string>();
   const categories = new Set<string>([categorieId]);
   if (responsableId) membres.add(responsableId);
+  for (const note of notes) membres.add(note.auteurId);
   for (const ligne of historique) {
     if (ligne.auteurId) membres.add(ligne.auteurId);
     const nature = NATURE_VALEUR_HISTORIQUE[ligne.type];
@@ -216,12 +261,24 @@ export async function lireDetailAvec(
       return ECHEC;
     }
 
-    const { data: lignes, error: erreurHistorique } = await client
-      .from("historique")
-      .select(COLONNES_HISTORIQUE)
-      .eq("demande_id", d.id as string)
-      .order("cree_le", { ascending: true })
-      .order("id", { ascending: true });
+    // Historique et notes : deux lectures indépendantes, lancées ensemble.
+    const [
+      { data: lignes, error: erreurHistorique },
+      { data: lignesNotes, error: erreurNotes },
+    ] = await Promise.all([
+      client
+        .from("historique")
+        .select(COLONNES_HISTORIQUE)
+        .eq("demande_id", d.id as string)
+        .order("cree_le", { ascending: true })
+        .order("id", { ascending: true }),
+      client
+        .from("notes")
+        .select(COLONNES_NOTES)
+        .eq("demande_id", d.id as string)
+        .order("cree_le", { ascending: true })
+        .order("id", { ascending: true }),
+    ]);
     if (erreurHistorique || !Array.isArray(lignes)) {
       console.error(
         `[detail] lecture de l'historique impossible : code=${erreurHistorique?.code ?? "aucun"}`,
@@ -233,9 +290,18 @@ export async function lireDetailAvec(
       .filter((ligne): ligne is LigneHistorique => ligne !== null);
     const lignesIllisibles = lignes.length - historique.length;
 
+    if (erreurNotes || !Array.isArray(lignesNotes)) {
+      console.error(`[detail] lecture des notes impossible : code=${erreurNotes?.code ?? "aucun"}`);
+      return ECHEC;
+    }
+    const notes = (lignesNotes as unknown[])
+      .map(lireNote)
+      .filter((note): note is NoteInterne => note !== null);
+    const notesIllisibles = lignesNotes.length - notes.length;
+
     const responsableId = d.responsable_id as string | null;
     const categorieId = d.categorie_id as string;
-    const ids = identifiantsCites(responsableId, categorieId, historique);
+    const ids = identifiantsCites(responsableId, categorieId, historique, notes);
     const [nomsMembres, nomsCategories] = await Promise.all([
       lireNoms(client, "membres", ids.membres),
       lireNoms(client, "categories", ids.categories),
@@ -262,6 +328,8 @@ export async function lireDetailAvec(
         etatEmail: d.etat_email as EtatEmail,
         historique,
         lignesIllisibles,
+        notes,
+        notesIllisibles,
         nomsMembres,
         nomsCategories,
       },

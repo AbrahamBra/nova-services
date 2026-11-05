@@ -12,16 +12,23 @@ import { creerClientService } from "@/lib/server/supabase-service";
 import {
   champPiegeRempli,
   lireSaisieDepot,
+  longueur,
   verifierDepot,
   type EtatDepot,
 } from "@/lib/schemas/depot";
-import { schemaIdentifiantDemande } from "@/lib/schemas/traitement";
+import {
+  LONGUEUR_MAX_NOTE,
+  MESSAGES_NOTE,
+  schemaIdentifiantDemande,
+  verifierTexteNote,
+} from "@/lib/schemas/traitement";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur sur les demandes (AD-7). Story 1.3 : dépôt public ;
 // story 1.7 : email de confirmation ; story 1.8 : champ piège et limite
 // d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base) ;
-// story 2.1 : prise en charge (traitement, avec la session du membre).
+// story 2.1 : prise en charge (traitement, avec la session du membre) ;
+// story 2.2 : notes internes.
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -309,4 +316,63 @@ export async function prendreEnCharge(demandeId: unknown): Promise<ResultatPrise
 
   refresh();
   return { ok: true, donnees: { responsableId: donnees.responsable_id } };
+}
+
+/** Résultat d'un ajout de note renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatAjoutNote = ResultatAction<{ noteId: string }>;
+
+/**
+ * Note interne du membre connecté sur une demande (`ajouter_note`), quel que
+ * soit son statut. Texte vérifié avec le même schéma que l'écran (AD-8) :
+ * un texte refusé ne va pas jusqu'à la base. Réussite ou refus « attendu »
+ * (introuvable, droit insuffisant) : le détail est rafraîchi. Texte refusé
+ * par la base (`DONNEES_INVALIDES`) : message du champ (vide ou trop long),
+ * affiché sous la zone. Erreur inattendue : rien ne change à l'écran.
+ */
+export async function ajouterNote(demandeId: unknown, texte: unknown): Promise<ResultatAjoutNote> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+  const note = verifierTexteNote(texte);
+  if (!note.ok) return refusTraitement("DONNEES_INVALIDES", note.message);
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[ajouterNote] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "ajouter_note", {
+    p_demande_id: identifiant.data,
+    p_texte: note.texte,
+  });
+
+  if (!resultat.ok) {
+    switch (resultat.code) {
+      case "DEMANDE_INTROUVABLE":
+      case "DROIT_INSUFFISANT":
+        refresh();
+        return refusTraitement(resultat.code);
+      case "DONNEES_INVALIDES":
+        // Message du champ, affiché sous la zone (pas de toast).
+        return refusTraitement(
+          "DONNEES_INVALIDES",
+          longueur(note.texte) > LONGUEUR_MAX_NOTE ? MESSAGES_NOTE.long : MESSAGES_NOTE.vide,
+        );
+      default:
+        // Jamais le détail technique vers le navigateur.
+        return refusTraitement(resultat.code);
+    }
+  }
+
+  const donnees = resultat.donnees as Record<string, unknown> | null;
+  const noteId = donnees?.id;
+  if (typeof noteId !== "number" && typeof noteId !== "string") {
+    console.error("[ajouterNote] réponse inattendue de ajouter_note");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: { noteId: String(noteId) } };
 }

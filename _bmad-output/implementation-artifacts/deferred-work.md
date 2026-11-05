@@ -56,6 +56,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-9-securiser-la-connexion.md`
   summary: Ajouter `tentatives_connexion` (plus d'un jour) et `envois_formulaire` (plus d'une heure) à `purger_technique`.
   evidence: l'effacement n'a lieu qu'à la connexion ou au dépôt suivant (AD-23).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-2-ajouter-une-note.md`
+  summary: Le refus du serveur dans le formulaire de note (et le bouton de prise en charge) n'est pas testé à l'écran.
+  evidence: aucun test ne fait renvoyer `ok: false` à l'action depuis un composant client ; il faudrait un montage de test de composant (Testing Library) ou un refus forcé en e2e.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
   summary: Documenter que GitHub suspend les tâches planifiées après 60 jours sans activité (sauvegarde et réveil), avec un rappel de surveillance.
   evidence: Limite de l'offre gratuite (epic-3-context) ; à écrire dans la fiche de maintenance, story 3.6.

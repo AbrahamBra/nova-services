@@ -29,6 +29,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+import { FournisseurToasts } from "@/components/nova/toasts";
 import ChargementDetail from "@/app/equipe/demandes/[reference]/loading";
 import PageDetailDemande, { generateMetadata } from "@/app/equipe/demandes/[reference]/page";
 
@@ -66,6 +67,9 @@ function detail(modifs: Partial<DetailDemande> = {}): DetailDemande {
     nomsMembres: { [KARIM]: "Karim Benali" },
     nomsCategories: { [CATEGORIE]: "Problème technique" },
     lignesIllisibles: 0,
+    // Story 2.2 : notes internes.
+    notes: [],
+    notesIllisibles: 0,
     ...modifs,
   };
 }
@@ -79,7 +83,8 @@ async function rendre(reference: string, parametres: Record<string, string> = {}
     params: Promise.resolve({ reference }),
     searchParams: Promise.resolve(parametres),
   } as unknown as PageProps<"/equipe/demandes/[reference]">);
-  return renderToStaticMarkup(element);
+  // Les toasts (story 2.1) sont fournis par la mise en page de l'espace équipe.
+  return renderToStaticMarkup(<FournisseurToasts>{element}</FournisseurToasts>);
 }
 
 beforeEach(() => {
@@ -129,9 +134,11 @@ describe("page /equipe/demandes/[reference] — états", () => {
     // Retour à la même page de la liste.
     expect(html).toContain('href="/equipe/demandes?page=2"');
     expect(html).toContain("← Retour aux demandes");
-    // Email envoyé : aucun bandeau ; aucune action (epic 2).
+    // Email envoyé : aucun bandeau ; demande En cours : aucune action dans
+    // le panneau, seul le bouton des notes internes (story 2.2).
     expect(html).not.toContain('data-testid="bandeau-email"');
-    expect(html).not.toContain("<button");
+    expect(html.match(/<button\b/g)).toHaveLength(1);
+    expect(html).toMatch(/<button\b[^>]*>Ajouter la note<\/button>/);
   });
 
   it("description : texte échappé, retours à la ligne conservés", async () => {
