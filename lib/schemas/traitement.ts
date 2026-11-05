@@ -6,6 +6,8 @@ import { longueur } from "@/lib/schemas/depot";
 // tout. Story 2.1 : identifiant de la demande à prendre en charge.
 // Story 2.2 : texte d'une note interne, schéma unique pour l'écran et
 // l'action `ajouterNote` (AD-8) ; même limite que la base (ajouter_note).
+// Story 2.3 : statut demandé à `changer_statut` et raison d'un classement
+// sans suite (même règle que le texte d'une note, message propre).
 
 /** Identifiant d'une demande (uuid). */
 export const schemaIdentifiantDemande = z.guid();
@@ -45,4 +47,32 @@ export function verifierTexteNote(saisie: unknown): VerificationNote {
   const resultat = schemaTexteNote.safeParse(saisie);
   if (resultat.success) return { ok: true, texte: resultat.data };
   return { ok: false, message: resultat.error.issues[0]?.message ?? MESSAGES_NOTE.vide };
+}
+
+/** Statuts qu'un changement de statut peut demander (story 2.3). */
+export const STATUTS_DEMANDABLES = ["en_cours", "traitee"] as const;
+export const schemaStatutDemande = z.enum(STATUTS_DEMANDABLES);
+export type StatutDemandable = z.infer<typeof schemaStatutDemande>;
+
+export const MESSAGES_CLASSEMENT = {
+  vide: "Écrivez la raison du classement.",
+  long: `La raison ne doit pas dépasser ${formaterNombre(LONGUEUR_MAX_NOTE)} caractères.`,
+  caractereInterdit: MESSAGES_NOTE.caractereInterdit,
+} as const;
+
+/** Traduit les messages du texte d'une note en messages de la raison du classement. */
+const MESSAGE_CLASSEMENT: Record<string, string> = {
+  [MESSAGES_NOTE.vide]: MESSAGES_CLASSEMENT.vide,
+  [MESSAGES_NOTE.long]: MESSAGES_CLASSEMENT.long,
+  [MESSAGES_NOTE.caractereInterdit]: MESSAGES_CLASSEMENT.caractereInterdit,
+};
+
+/**
+ * Raison d'un classement sans suite (écran et action) : même schéma que le
+ * texte d'une note (`schemaTexteNote`), elle devient une note interne.
+ */
+export function verifierRaisonClassement(saisie: unknown): VerificationNote {
+  const resultat = verifierTexteNote(saisie);
+  if (resultat.ok) return resultat;
+  return { ok: false, message: MESSAGE_CLASSEMENT[resultat.message] ?? MESSAGES_CLASSEMENT.vide };
 }

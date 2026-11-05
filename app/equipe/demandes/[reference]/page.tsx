@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BoutonPrendreEnCharge } from "@/components/nova/actions-demande";
+import { ActionsStatut, BoutonPrendreEnCharge } from "@/components/nova/actions-demande";
 import { BadgePriorite, BadgeStatut } from "@/components/nova/badges";
 import { Historique } from "@/components/nova/historique";
 import { FormulaireNote, ListeNotes } from "@/components/nova/notes";
@@ -17,7 +17,9 @@ import { formaterDateHeure } from "@/lib/format";
 // à droite (en dessous sur téléphone) : responsable, statut, priorité,
 // catégorie. Story 2.1 : « Prendre en charge » si la demande est Nouvelle
 // et sans responsable. Story 2.2 : bloc « Notes internes », entre Demandeur
-// et Historique (liste et ajout, quel que soit le statut).
+// et Historique (liste et ajout, quel que soit le statut). Story 2.3 :
+// boutons de statut sous le badge (« Marquer comme traitée », « Rouvrir »,
+// « Classer sans suite » avec sa fenêtre de confirmation).
 // Les autres actions arrivent avec l'epic 2.
 // Lu avec la session de la personne connectée (RLS), jamais mis en cache.
 export const dynamic = "force-dynamic";
@@ -207,6 +209,8 @@ function Detail({ demande }: { demande: DetailDemande }) {
             </Info>
             <Info libelle="Statut">
               <BadgeStatut statut={demande.statut} />
+              {/* Story 2.3 : seul le passage permis pour ce statut (règle 1). */}
+              <ActionsStatut demandeId={demande.id} statut={demande.statut} />
             </Info>
             <Info libelle="Priorité">
               <BadgePriorite priorite={demande.priorite} />

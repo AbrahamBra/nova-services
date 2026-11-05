@@ -26,6 +26,9 @@ test.beforeEach(async ({ context }) => {
 const EMAIL_TEST = "sophie.garnier@example.com";
 const PHRASE = "Un email de confirmation vous a été envoyé.";
 const ADRESSE_CONFIRMATION = /\/confirmation\/([0-9a-f]{64})$/;
+// Dépôt complet (base, email, page de confirmation) : plus de 5 s quand toute
+// la suite tourne en parallèle sur le serveur de développement.
+const ATTENTE_DEPOT = { timeout: 20_000 };
 
 const noms: string[] = [];
 
@@ -80,7 +83,7 @@ async function deposerParLeFormulaire(page: Page, nom: string): Promise<string> 
     })
     .click();
   await page.getByRole("button", { name: "Envoyer ma demande" }).click();
-  await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+  await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
   return ADRESSE_CONFIRMATION.exec(page.url())![1];
 }
 

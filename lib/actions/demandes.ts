@@ -19,16 +19,21 @@ import {
 import {
   LONGUEUR_MAX_NOTE,
   MESSAGES_NOTE,
+  MESSAGES_CLASSEMENT,
   schemaIdentifiantDemande,
+  schemaStatutDemande,
+  verifierRaisonClassement,
   verifierTexteNote,
 } from "@/lib/schemas/traitement";
+import { STATUTS, type Statut } from "@/lib/domaine";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur sur les demandes (AD-7). Story 1.3 : dépôt public ;
 // story 1.7 : email de confirmation ; story 1.8 : champ piège et limite
 // d'envois (5 en 10 minutes par empreinte d'IP, vérifiée par la base) ;
 // story 2.1 : prise en charge (traitement, avec la session du membre) ;
-// story 2.2 : notes internes.
+// story 2.2 : notes internes ; story 2.3 : changement de statut et
+// classement sans suite.
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -375,4 +380,130 @@ export async function ajouterNote(demandeId: unknown, texte: unknown): Promise<R
 
   refresh();
   return { ok: true, donnees: { noteId: String(noteId) } };
+}
+
+/** État de la demande après un changement de statut (story 2.3). */
+export type EtatApresStatut = {
+  statut: Statut;
+  responsableId: string | null;
+  /** La demande avait-elle un responsable avant le changement ? */
+  avaitResponsable: boolean;
+};
+
+/** Résultat d'un changement de statut renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatChangementStatut = ResultatAction<EtatApresStatut>;
+
+function lireEtatApresStatut(donnees: unknown): EtatApresStatut | null {
+  if (typeof donnees !== "object" || donnees === null) return null;
+  const v = donnees as Record<string, unknown>;
+  if (!(STATUTS as readonly unknown[]).includes(v.statut)) return null;
+  if (v.responsable_id !== null && typeof v.responsable_id !== "string") return null;
+  if (typeof v.avait_responsable !== "boolean") return null;
+  return {
+    statut: v.statut as Statut,
+    responsableId: v.responsable_id,
+    avaitResponsable: v.avait_responsable,
+  };
+}
+
+/** Refus « attendus » d'un changement de statut : le détail est rafraîchi. */
+function refusStatut(code: CodeErreur) {
+  switch (code) {
+    case "DEMANDE_INTROUVABLE":
+    case "PASSAGE_INTERDIT":
+    case "DROIT_INSUFFISANT":
+      refresh();
+      return refusTraitement(code);
+    default:
+      // Jamais le détail technique vers le navigateur.
+      return refusTraitement(code);
+  }
+}
+
+/**
+ * Changement de statut (`changer_statut`) : « Marquer comme traitée »
+ * (En cours → Traitée) ou « Rouvrir » (Traitée → En cours, ou Nouvelle si
+ * le responsable n'est plus actif). Renvoie le statut réel obtenu. Réussite
+ * ou refus attendu : le détail est rafraîchi. Statut demandé hors liste :
+ * `PASSAGE_INTERDIT` sans appel à la base.
+ */
+export async function changerStatut(
+  demandeId: unknown,
+  statut: unknown,
+): Promise<ResultatChangementStatut> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+  const demande = schemaStatutDemande.safeParse(statut);
+  if (!demande.success) return refusTraitement("PASSAGE_INTERDIT");
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[changerStatut] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "changer_statut", {
+    p_demande_id: identifiant.data,
+    p_statut: demande.data,
+  });
+  if (!resultat.ok) return refusStatut(resultat.code);
+
+  const etat = lireEtatApresStatut(resultat.donnees);
+  if (!etat) {
+    console.error("[changerStatut] réponse inattendue de changer_statut");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: etat };
+}
+
+/**
+ * Classement sans suite d'une demande Nouvelle (`classer_sans_suite`), avec
+ * la raison, qui devient une note interne. Raison vérifiée avec le même
+ * schéma que l'écran (AD-8) : refusée sans appel à la base, message du champ.
+ * Réussite ou refus attendu : le détail est rafraîchi.
+ */
+export async function classerSansSuite(
+  demandeId: unknown,
+  raison: unknown,
+): Promise<ResultatChangementStatut> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+  const note = verifierRaisonClassement(raison);
+  if (!note.ok) return refusTraitement("DONNEES_INVALIDES", note.message);
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[classerSansSuite] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "classer_sans_suite", {
+    p_demande_id: identifiant.data,
+    p_note: note.texte,
+  });
+  if (!resultat.ok) {
+    if (resultat.code === "DONNEES_INVALIDES") {
+      // Message du champ, affiché sous la zone (pas de toast).
+      return refusTraitement(
+        "DONNEES_INVALIDES",
+        longueur(note.texte) > LONGUEUR_MAX_NOTE ? MESSAGES_CLASSEMENT.long : MESSAGES_CLASSEMENT.vide,
+      );
+    }
+    return refusStatut(resultat.code);
+  }
+
+  const etat = lireEtatApresStatut(resultat.donnees);
+  if (!etat) {
+    console.error("[classerSansSuite] réponse inattendue de classer_sans_suite");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: etat };
 }
