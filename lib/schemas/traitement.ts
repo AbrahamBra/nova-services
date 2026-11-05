@@ -10,6 +10,7 @@ import { longueur } from "@/lib/schemas/depot";
 // Story 2.3 : statut demandé à `changer_statut` et raison d'un classement
 // sans suite (même règle que le texte d'une note, message propre).
 // Story 2.4 : priorité et catégorie (voir en fin de fichier).
+// Story 2.7 : membre à qui attribuer une demande (voir en fin de fichier).
 
 /** Identifiant d'une demande (uuid). */
 export const schemaIdentifiantDemande = z.guid();
@@ -88,3 +89,9 @@ export const schemaPrioriteDemande = z.enum(PRIORITES);
 
 /** Identifiant d'une catégorie (uuid). */
 export const schemaIdentifiantCategorie = z.guid();
+
+// Story 2.7 : membre à qui `attribuer` confie la demande (uuid ; la base
+// vérifie qu'il existe et qu'il est actif).
+
+/** Identifiant d'un membre (uuid). */
+export const schemaIdentifiantMembre = z.guid();
