@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
+  ActionsResponsable,
   ActionsStatut,
-  BoutonPrendreEnCharge,
   ChoixCategorie,
   ChoixPriorite,
 } from "@/components/nova/actions-demande";
@@ -16,6 +16,8 @@ import { lireDetail, type DetailDemande } from "@/lib/detail-demande";
 import { LIBELLES_CANAL, type EtatEmail } from "@/lib/domaine";
 import { adresseListe, lireFiltres, lireNumeroPage } from "@/lib/filtres";
 import { formaterDateHeure } from "@/lib/format";
+import { lireMembresActifs, type MembreActif } from "@/lib/options-filtres";
+import { lireProfil } from "@/lib/session";
 
 // Détail d'une demande (EXPERIENCE.md §9.5, maquette key-detail-demande.html,
 // story 1.6) : en-tête, description telle que saisie, demandeur, bandeau si
@@ -29,7 +31,12 @@ import { formaterDateHeure } from "@/lib/format";
 // listes « Priorité » et « Catégorie » (catégories actives dans l'ordre des
 // formulaires, et état réel de la catégorie actuelle, lus seulement pour une
 // demande trouvée ; liste vide ou illisible : le nom seul et « Liste des
-// catégories indisponible. »). Libérer et attribuer : story 2.7.
+// catégories indisponible. »). Story 2.7 : « Libérer » (demande En cours,
+// pour son responsable ou un administrateur) et « Attribuer à… »
+// (administrateur, demande non Traitée : fenêtre avec les membres actifs,
+// sans le responsable actuel ; liste illisible : « Liste des membres
+// indisponible. »). Un collaborateur ne voit ni l'un ni l'autre sur une
+// demande dont il n'est pas responsable.
 // Tout est lu avec la session de la personne connectée (RLS), jamais mis en cache.
 export const dynamic = "force-dynamic";
 
@@ -112,13 +119,21 @@ const ID_LIBELLE_CATEGORIE = "libelle-categorie";
 
 const MESSAGE_CATEGORIES_INDISPONIBLES = "Liste des catégories indisponible.";
 
+/** Actions de la partie « Responsable » permises pour ce statut et ce rôle. */
+type ActionsPermises = {
+  peutLiberer: boolean;
+  attribution: MembreActif[] | "indisponible" | null;
+};
+
 function Detail({
   demande,
   categories,
+  actions,
 }: {
   demande: DetailDemande;
   /** Catégories de la liste, ou null si elles n'ont pas pu être lues. */
   categories: CategoriesDetail | null;
+  actions: ActionsPermises;
 }) {
   const bandeauEmail = BANDEAUX_EMAIL[demande.etatEmail];
   const lienTelephone = demande.telephone ? adresseTelephone(demande.telephone) : null;
@@ -226,10 +241,13 @@ function Detail({
           <dl>
             <Info libelle="Responsable">
               <span data-testid="responsable">{responsable}</span>
-              {/* Même condition que prendre_en_charge : Nouvelle et sans responsable. */}
-              {demande.statut === "nouvelle" && demande.responsableId === null ? (
-                <BoutonPrendreEnCharge demandeId={demande.id} />
-              ) : null}
+              <ActionsResponsable
+                demandeId={demande.id}
+                // Même condition que prendre_en_charge : Nouvelle et sans responsable.
+                prendre={demande.statut === "nouvelle" && demande.responsableId === null}
+                peutLiberer={actions.peutLiberer}
+                attribution={actions.attribution}
+              />
             </Info>
             <Info libelle="Statut">
               <BadgeStatut statut={demande.statut} />
@@ -272,6 +290,31 @@ function Detail({
       </div>
     </>
   );
+}
+
+/**
+ * « Libérer » : demande En cours, et je suis son responsable ou
+ * administrateur. « Attribuer à… » : administrateur, demande non Traitée.
+ * Profil illisible : message « indisponible » à la place des actions.
+ */
+async function actionsPermises(demande: DetailDemande): Promise<ActionsPermises> {
+  const profil = await lireProfil();
+  // Profil illisible : les actions ne disparaissent pas en silence.
+  if (!profil.ok) return { peutLiberer: false, attribution: "indisponible" };
+  const moi = profil.donnees;
+  if (!moi) return { peutLiberer: false, attribution: null };
+
+  const peutLiberer =
+    demande.statut === "en_cours" && (demande.responsableId === moi.id || moi.estAdmin);
+  if (!moi.estAdmin || demande.statut === "traitee") return { peutLiberer, attribution: null };
+
+  const membres = await lireMembresActifs();
+  return {
+    peutLiberer,
+    attribution: membres.ok
+      ? membres.donnees.filter((m) => m.id !== demande.responsableId)
+      : "indisponible",
+  };
 }
 
 export default async function PageDetailDemande({
@@ -321,12 +364,20 @@ export default async function PageDetailDemande({
   }
 
   // Seulement pour une demande trouvée.
-  const categories = await lireCategoriesActives(resultat.donnees.categorieId);
+  const demande = resultat.donnees;
+  const [categories, actions] = await Promise.all([
+    lireCategoriesActives(demande.categorieId),
+    actionsPermises(demande),
+  ]);
 
   return (
     <>
       {lienRetour}
-      <Detail demande={resultat.donnees} categories={categories.ok ? categories.donnees : null} />
+      <Detail
+        demande={demande}
+        categories={categories.ok ? categories.donnees : null}
+        actions={actions}
+      />
     </>
   );
 }

@@ -33,6 +33,9 @@ import { Client } from "pg";
 // pour anon.
 // Story 2.6 : saisir_demande pour le membre connecté (la fonction vérifie
 // elle-même qu'il est actif) ; rien pour anon.
+// Story 2.7 : liberer et attribuer pour le membre connecté (les fonctions
+// vérifient elles-mêmes le membre actif, l'administrateur pour attribuer) ;
+// rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -47,12 +50,14 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
+  "authenticated:fonction:public.attribuer(p_demande_id uuid, p_membre_id uuid):EXECUTE",
   "authenticated:fonction:public.changer_categorie(p_demande_id uuid, p_categorie_id uuid):EXECUTE",
   "authenticated:fonction:public.changer_priorite(p_demande_id uuid, p_priorite text):EXECUTE",
   "authenticated:fonction:public.changer_statut(p_demande_id uuid, p_statut text):EXECUTE",
   "authenticated:fonction:public.classer_sans_suite(p_demande_id uuid, p_note text):EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
+  "authenticated:fonction:public.liberer(p_demande_id uuid):EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
   "authenticated:fonction:public.rechercher_demandes(p_texte text):EXECUTE",
   "authenticated:fonction:public.saisir_demande(p_cle_envoi uuid, p_canal text, p_nom text, p_email text, p_telephone text, p_societe text, p_categorie_id uuid, p_objet text, p_description text):EXECUTE",

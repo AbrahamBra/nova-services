@@ -41,6 +41,8 @@ export const MESSAGES_ERREUR = {
   PASSAGE_INTERDIT: "Ce changement de statut n'est pas autorisé.",
   // Story 2.6 — saisie interne (saisir_demande) : ni email ni téléphone.
   COORDONNEES_REQUISES: "Indiquez au moins un email ou un téléphone.",
+  // Story 2.7 — attribution (attribuer) : membre cible inconnu, invité ou désactivé.
+  MEMBRE_INVALIDE: "Ce membre n'est pas actif.",
   // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
   ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
 } as const;

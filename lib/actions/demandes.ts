@@ -22,6 +22,7 @@ import {
   MESSAGES_CLASSEMENT,
   schemaIdentifiantCategorie,
   schemaIdentifiantDemande,
+  schemaIdentifiantMembre,
   schemaPrioriteDemande,
   schemaStatutDemande,
   verifierRaisonClassement,
@@ -41,7 +42,8 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 // story 2.1 : prise en charge (traitement, avec la session du membre) ;
 // story 2.2 : notes internes ; story 2.3 : changement de statut et
 // classement sans suite ; story 2.4 : priorité et catégorie ; story 2.6 :
-// saisie interne d'une demande reçue par téléphone ou par email.
+// saisie interne d'une demande reçue par téléphone ou par email ; story 2.7 :
+// libérer ou attribuer une demande.
 
 type ReponseDepot = { reference: string; jeton: string };
 
@@ -632,6 +634,104 @@ export async function changerCategorie(
 
   refresh();
   return { ok: true, donnees: { categorieId: changement.valeur, modifiee: changement.modifiee } };
+}
+
+// --- Libérer et attribuer (story 2.7) ----------------------------------------
+
+/** Résultat d'une libération renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatLiberation = ResultatAction<{ statut: Statut }>;
+
+/** Résultat d'une attribution renvoyé à l'écran (AD-7), sans `detail`. */
+export type ResultatAttribution = ResultatAction<{ responsableId: string }>;
+
+/**
+ * Refus « attendus » d'une libération ou d'une attribution : l'action n'est
+ * plus possible (ou plus permise), le détail est rafraîchi pour montrer le
+ * vrai état. Erreur inattendue : rien ne change à l'écran.
+ */
+function refusResponsable(code: CodeErreur) {
+  switch (code) {
+    case "DEMANDE_INTROUVABLE":
+    case "PASSAGE_INTERDIT":
+    case "DROIT_INSUFFISANT":
+    case "MEMBRE_INVALIDE":
+      refresh();
+      return refusTraitement(code);
+    default:
+      // Jamais le détail technique vers le navigateur.
+      return refusTraitement(code);
+  }
+}
+
+/**
+ * Libération d'une demande En cours (`liberer`) par son responsable ou un
+ * administrateur : elle revient en Nouvelle, sans responsable. Déjà libérée
+ * (double clic) : réussite sans changement. Réussite ou refus attendu : le
+ * détail est rafraîchi.
+ */
+export async function liberer(demandeId: unknown): Promise<ResultatLiberation> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[liberer] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "liberer", { p_demande_id: identifiant.data });
+  if (!resultat.ok) return refusResponsable(resultat.code);
+
+  const donnees = resultat.donnees as Record<string, unknown> | null;
+  if (donnees?.statut !== "nouvelle" || donnees.responsable_id !== null) {
+    console.error("[liberer] réponse inattendue de liberer");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: { statut: "nouvelle" } };
+}
+
+/**
+ * Attribution d'une demande Nouvelle ou En cours à un membre actif
+ * (`attribuer`), réservée à un administrateur (la base le vérifie).
+ * Identifiant du membre mal formé : `MEMBRE_INVALIDE` sans appel à la base.
+ * Cible déjà responsable : réussite sans changement. Réussite ou refus
+ * attendu : le détail est rafraîchi.
+ */
+export async function attribuer(
+  demandeId: unknown,
+  membreId: unknown,
+): Promise<ResultatAttribution> {
+  const identifiant = schemaIdentifiantDemande.safeParse(demandeId);
+  if (!identifiant.success) return refusTraitement("DEMANDE_INTROUVABLE");
+  const membre = schemaIdentifiantMembre.safeParse(membreId);
+  if (!membre.success) return refusTraitement("MEMBRE_INVALIDE");
+
+  let client;
+  try {
+    client = await creerClientServeur();
+  } catch {
+    console.error("[attribuer] client serveur indisponible");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  const resultat = await appeler<unknown>(client, "attribuer", {
+    p_demande_id: identifiant.data,
+    p_membre_id: membre.data,
+  });
+  if (!resultat.ok) return refusResponsable(resultat.code);
+
+  const donnees = resultat.donnees as Record<string, unknown> | null;
+  if (donnees?.statut !== "en_cours" || typeof donnees.responsable_id !== "string") {
+    console.error("[attribuer] réponse inattendue de attribuer");
+    return refusTraitement("ERREUR_INATTENDUE");
+  }
+
+  refresh();
+  return { ok: true, donnees: { responsableId: donnees.responsable_id } };
 }
 
 // --- Saisie interne (story 2.6) ----------------------------------------------

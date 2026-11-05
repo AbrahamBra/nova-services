@@ -29,12 +29,15 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  attribuer,
   changerCategorie,
   changerPriorite,
   changerStatut,
   classerSansSuite,
+  liberer,
   prendreEnCharge,
   type EtatApresStatut,
+  type ResultatAttribution,
   type ResultatChangementStatut,
 } from "@/lib/actions/demandes";
 import {
@@ -46,6 +49,7 @@ import {
 } from "@/lib/domaine";
 import { messageErreur, type CodeErreur } from "@/lib/erreurs";
 import { formaterNombre } from "@/lib/format";
+import type { MembreActif } from "@/lib/options-filtres";
 import { longueur } from "@/lib/schemas/depot";
 import {
   LONGUEUR_MAX_NOTE,
@@ -65,6 +69,10 @@ import {
 // sans suite » (Nouvelle, fenêtre de confirmation avec raison obligatoire).
 // Story 2.4 : listes « Priorité » et « Catégorie », quel que soit le statut ;
 // le choix d'une valeur l'enregistre aussitôt.
+// Story 2.7 : partie « Responsable » complète (`ActionsResponsable`) :
+// « Prendre en charge », « Libérer » (responsable ou administrateur, demande
+// En cours, sans fenêtre : l'action se défait) et « Attribuer à… »
+// (administrateur, demande non Traitée, fenêtre de choix du membre).
 
 /** Message de réussite de la prise en charge (EXPERIENCE.md §10, flow 2). */
 export const MESSAGE_PRISE_EN_CHARGE = "Vous êtes responsable de cette demande.";
@@ -96,6 +104,323 @@ export function BoutonPrendreEnCharge({ demandeId }: { demandeId: string }) {
     <Bouton type="button" onClick={prendre} disabled={envoi} className="mt-3 w-full">
       {envoi ? "Prise en charge…" : "Prendre en charge"}
     </Bouton>
+  );
+}
+
+// --- Libérer et attribuer (story 2.7) ----------------------------------------
+
+/** Messages de la partie « Responsable » (story 2.7). */
+export const MESSAGE_LIBERATION = "Demande libérée. Elle revient en Nouvelle.";
+
+export function messageAttribution(nom: string): string {
+  return `Demande attribuée à ${nom}.`;
+}
+
+export const TEXTE_FENETRE_ATTRIBUTION =
+  "Le membre choisi deviendra responsable de la demande, qui passera En cours.";
+export const LIBELLE_MEMBRE_ATTRIBUTION = "Membre";
+export const MESSAGE_CHOISIR_MEMBRE = "Choisissez un membre.";
+export const MESSAGE_AUCUN_MEMBRE = "Aucun autre membre actif.";
+export const MESSAGE_MEMBRES_INDISPONIBLES = "Liste des membres indisponible.";
+
+
+const CLASSE_BOUTON_RESPONSABLE =
+  "mt-3 h-11 w-full rounded-md bg-surface px-5 text-[15px] font-semibold text-foreground";
+
+const CLASSE_LISTE_MEMBRES =
+  "w-full [&_select]:h-11 [&_select]:rounded-md [&_select]:bg-surface [&_select]:pl-3 [&_select]:text-[15px]";
+
+/**
+ * « Libérer » : bouton secondaire, sans fenêtre de confirmation (l'action se
+ * défait : on peut reprendre la demande). Le bouton disparaît après la
+ * libération : le focus va à la partie « Responsable ».
+ */
+function BoutonLiberer({ demandeId, focaliser }: { demandeId: string; focaliser: () => void }) {
+  const [envoi, demarrer] = useTransition();
+  // Appel « en vol » : deux clics avant le nouveau rendu n'envoient qu'un appel.
+  const enVol = useRef(false);
+  const { afficher } = useToasts();
+
+  function liberation() {
+    if (enVol.current) return;
+    enVol.current = true;
+    demarrer(async () => {
+      try {
+        const resultat = await liberer(demandeId);
+        if (resultat.ok) {
+          afficher("succes", MESSAGE_LIBERATION);
+          focaliser();
+        } else {
+          afficher("erreur", resultat.message);
+          if (CODES_REFUS_ATTENDUS.includes(resultat.code)) focaliser();
+        }
+      } catch {
+        // Action injoignable (réseau coupé) : rien ne change à l'écran.
+        afficher("erreur", messageErreur("ERREUR_INATTENDUE"));
+      } finally {
+        enVol.current = false;
+      }
+    });
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={liberation}
+      disabled={envoi}
+      className={CLASSE_BOUTON_RESPONSABLE}
+    >
+      {envoi ? "Libération…" : "Libérer"}
+    </Button>
+  );
+}
+
+/**
+ * Fenêtre « Attribuer à… » (administrateur) : AlertDialog shadcn (focus
+ * gardé dans la fenêtre, Échap ferme, focus rendu au bouton d'origine,
+ * « Annuler » sélectionné à l'ouverture). Liste des membres actifs par nom,
+ * sans le responsable actuel.
+ * - Aucun membre choisi : message sous la liste, rien n'est envoyé.
+ * - Réussite : toast « Demande attribuée à [nom]. », fenêtre fermée.
+ * - Membre devenu inactif (`MEMBRE_INVALIDE`) : message sous la liste,
+ *   fenêtre ouverte, liste rafraîchie.
+ * - Refus attendu (passage interdit, introuvable, droit) : fenêtre fermée,
+ *   toast rouge, focus sur la partie « Responsable » (détail rafraîchi).
+ * - Erreur serveur ou réseau : toast rouge, fenêtre ouverte, choix conservé.
+ */
+function FenetreAttribuer({
+  demandeId,
+  membres,
+  focaliser,
+}: {
+  demandeId: string;
+  membres: MembreActif[];
+  focaliser: () => void;
+}) {
+  const id = useId();
+  const idListe = `${id}-membre`;
+  const idErreur = `${id}-erreur`;
+  const listeRef = useRef<HTMLSelectElement>(null);
+  const [ouverte, setOuverte] = useState(false);
+  const [choix, setChoix] = useState("");
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [envoi, demarrer] = useTransition();
+  // Appel « en vol » : deux clics avant le nouveau rendu n'envoient qu'un appel.
+  const enVol = useRef(false);
+  // Refus attendu : à la fermeture, le focus va à la partie « Responsable »,
+  // le bouton d'origine pouvant avoir disparu.
+  const focusSurResponsable = useRef(false);
+  const { afficher } = useToasts();
+
+  // Message sous la liste : focus sur la liste une fois l'envoi terminé
+  // (pendant l'envoi, elle est désactivée et ne peut pas le recevoir).
+  useEffect(() => {
+    if (!envoi && erreur) listeRef.current?.focus();
+  }, [envoi, erreur]);
+
+  // Le choix n'est valable que s'il figure encore dans la liste (rafraîchie).
+  const choisi = membres.find((m) => m.id === choix) ?? null;
+
+  function changerOuverture(valeur: boolean) {
+    // Pas de fermeture (Échap) pendant l'envoi.
+    if (!valeur && enVol.current) return;
+    setOuverte(valeur);
+    if (valeur) {
+      focusSurResponsable.current = false;
+    } else {
+      setErreur(null);
+      setChoix("");
+    }
+  }
+
+  function soumettre(evenement: FormEvent<HTMLFormElement>) {
+    evenement.preventDefault();
+    if (enVol.current) return;
+    if (!choisi) {
+      setErreur(MESSAGE_CHOISIR_MEMBRE);
+      listeRef.current?.focus();
+      return;
+    }
+
+    const membre = choisi;
+    setErreur(null);
+    enVol.current = true;
+    demarrer(async () => {
+      let resultat: ResultatAttribution;
+      try {
+        resultat = await attribuer(demandeId, membre.id);
+      } catch {
+        resultat = {
+          ok: false,
+          code: "ERREUR_INATTENDUE",
+          message: messageErreur("ERREUR_INATTENDUE"),
+        };
+      } finally {
+        enVol.current = false;
+      }
+      if (resultat.ok) {
+        afficher("succes", messageAttribution(membre.nom));
+        setChoix("");
+        setOuverte(false);
+      } else if (resultat.code === "MEMBRE_INVALIDE") {
+        // Membre désactivé entre-temps : message sous la liste.
+        setChoix("");
+        setErreur(resultat.message);
+      } else if (CODES_REFUS_ATTENDUS.includes(resultat.code)) {
+        focusSurResponsable.current = true;
+        afficher("erreur", resultat.message);
+        setChoix("");
+        setOuverte(false);
+        // Focus rendu directement : le rafraîchissement peut retirer la
+        // fenêtre (demande Traitée) sans que `onCloseAutoFocus` ne se produise.
+        setTimeout(focaliser, 0);
+      } else {
+        // Erreur serveur ou réseau : la fenêtre reste ouverte, choix conservé.
+        afficher("erreur", resultat.message);
+      }
+    });
+  }
+
+  const aucunMembre = membres.length === 0;
+
+  return (
+    <AlertDialog open={ouverte} onOpenChange={changerOuverture}>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="outline" className={CLASSE_BOUTON_RESPONSABLE}>
+          Attribuer à…
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent
+        onCloseAutoFocus={(evenement) => {
+          if (!focusSurResponsable.current) return;
+          focusSurResponsable.current = false;
+          evenement.preventDefault();
+          focaliser();
+        }}
+        className="rounded-lg bg-surface p-5 shadow-sm data-[size=default]:max-w-[calc(100%-2rem)] data-[size=default]:sm:max-w-md"
+      >
+        <form noValidate onSubmit={soumettre} className="grid gap-4">
+          <AlertDialogHeader className="place-items-start text-left">
+            <AlertDialogTitle className="text-lg font-semibold leading-[1.4]">
+              Attribuer la demande
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left text-sm leading-[1.5] text-foreground">
+              {TEXTE_FENETRE_ATTRIBUTION}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {aucunMembre ? (
+            <p data-testid="aucun-membre" className="text-sm text-muted-foreground">
+              {MESSAGE_AUCUN_MEMBRE}
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor={idListe} className="text-sm font-medium leading-[1.4]">
+                {LIBELLE_MEMBRE_ATTRIBUTION}
+              </Label>
+              <NativeSelect
+                ref={listeRef}
+                id={idListe}
+                name="membre"
+                value={choisi ? choisi.id : ""}
+                disabled={envoi}
+                onChange={(evenement) => {
+                  setChoix(evenement.target.value);
+                  if (erreur) setErreur(null);
+                }}
+                aria-invalid={erreur ? true : undefined}
+                aria-describedby={erreur ? idErreur : undefined}
+                data-testid="choix-membre"
+                className={CLASSE_LISTE_MEMBRES}
+              >
+                <NativeSelectOption value="" disabled>
+                  Choisissez un membre
+                </NativeSelectOption>
+                {membres.map((m) => (
+                  <NativeSelectOption key={m.id} value={m.id}>
+                    {m.nom}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <div id={idErreur} aria-live="polite">
+                {erreur ? (
+                  <p data-testid="erreur-membre" className="text-[13px] leading-[1.4] text-destructive">
+                    {erreur}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter className="-mx-5 -mb-5 bg-surface p-5 sm:justify-between">
+            <AlertDialogCancel
+              disabled={envoi}
+              className="h-11 rounded-md bg-surface px-5 text-[15px] font-semibold text-foreground"
+            >
+              Annuler
+            </AlertDialogCancel>
+            <Button
+              type="submit"
+              disabled={envoi || aucunMembre}
+              className="h-11 rounded-md px-5 text-[15px] font-semibold"
+            >
+              {envoi ? "Attribution…" : "Attribuer"}
+            </Button>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/**
+ * Partie « Responsable » du panneau (EXPERIENCE.md §9.5) : la page décide
+ * des actions permises pour ce statut et ce rôle ; la base refuse de toute
+ * façon une action interdite. Le conteneur reste en place quand les boutons
+ * changent : après une action dont le bouton disparaît, il reçoit le focus.
+ */
+export function ActionsResponsable({
+  demandeId,
+  prendre,
+  peutLiberer,
+  attribution,
+}: {
+  demandeId: string;
+  /** « Prendre en charge » : demande Nouvelle sans responsable. */
+  prendre: boolean;
+  /** « Libérer » : demande En cours, et je suis le responsable ou administrateur. */
+  peutLiberer: boolean;
+  /**
+   * « Attribuer à… » (administrateur, demande non Traitée) : membres actifs
+   * sans le responsable actuel ; « indisponible » si la liste n'a pas pu être
+   * lue ; null : pas d'attribution.
+   */
+  attribution: MembreActif[] | "indisponible" | null;
+}) {
+  const conteneur = useRef<HTMLDivElement>(null);
+  const focaliser = () => conteneur.current?.focus();
+
+  return (
+    <div
+      ref={conteneur}
+      tabIndex={-1}
+      role="group"
+      aria-label="Actions sur le responsable"
+      data-testid="actions-responsable"
+      className="rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      {prendre ? <BoutonPrendreEnCharge demandeId={demandeId} /> : null}
+      {attribution === "indisponible" ? (
+        <span
+          data-testid="membres-indisponibles"
+          className="mt-1 block text-[13px] font-normal text-muted-foreground"
+        >
+          {MESSAGE_MEMBRES_INDISPONIBLES}
+        </span>
+      ) : attribution ? (
+        <FenetreAttribuer demandeId={demandeId} membres={attribution} focaliser={focaliser} />
+      ) : null}
+      {peutLiberer ? <BoutonLiberer demandeId={demandeId} focaliser={focaliser} /> : null}
+    </div>
   );
 }
 
