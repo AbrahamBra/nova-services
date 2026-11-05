@@ -156,15 +156,21 @@ function passage({ ancienne, nouvelle }: ValeursHistorique): string {
  */
 export const AVANT_AUTEUR_HISTORIQUE: Partial<Record<TypeHistorique, string>> = {
   prise_en_charge: "Prise en charge par ",
+  // Story 2.3 : « Classée sans suite par Karim Benali : Nouvelle → Traitée ».
+  classement_sans_suite: "Classée sans suite par ",
 };
 
 /**
  * Types dont le passage (« : Nouvelle → En cours ») est omis quand les
  * valeurs stockées ne sont pas des codes connus : anciennes lignes
  * `prise_en_charge` (identifiant du membre dans `nouvelle_valeur`), affichées
- * « Prise en charge par [nom] ».
+ * « Prise en charge par [nom] » ; lignes `classement_sans_suite` sans
+ * valeurs, affichées « Classée sans suite par [nom] ».
  */
-export const TYPES_PASSAGE_OMIS_SI_INCONNU: readonly TypeHistorique[] = ["prise_en_charge"];
+export const TYPES_PASSAGE_OMIS_SI_INCONNU: readonly TypeHistorique[] = [
+  "prise_en_charge",
+  "classement_sans_suite",
+];
 
 export const PHRASES_HISTORIQUE: Record<
   TypeHistorique,
@@ -184,7 +190,8 @@ export const PHRASES_HISTORIQUE: Record<
     nouvelle ? `a attribué la demande à ${nouvelle}` : "a attribué la demande",
   liberation: () => "a libéré la demande",
   changement_statut: (valeurs) => `a changé le statut${passage(valeurs)}`,
-  classement_sans_suite: () => "a classé la demande sans suite",
+  // Auteur au milieu de la phrase (voir AVANT_AUTEUR_HISTORIQUE).
+  classement_sans_suite: (valeurs) => passage(valeurs).trimStart(),
   changement_priorite: (valeurs) => `a changé la priorité${passage(valeurs)}`,
   changement_categorie: (valeurs) => `a changé la catégorie${passage(valeurs)}`,
   note_ajoutee: () => "a ajouté une note interne",

@@ -15,6 +15,9 @@ loadEnvConfig(process.cwd(), true, { info: () => {}, error: console.error });
 
 const EMAIL_TEST = "sophie.garnier@example.com";
 const ADRESSE_CONFIRMATION = /\/confirmation\/[0-9a-f]{64}$/;
+// Dépôt complet (base, email, page de confirmation) : plus de 5 s quand toute
+// la suite tourne en parallèle sur le serveur de développement.
+const ATTENTE_DEPOT = { timeout: 20_000 };
 const MESSAGE_TROP = "Trop d'envois depuis votre connexion. Réessayez dans quelques minutes.";
 const MESSAGE_NEUTRE = "Votre demande n'a pas pu être envoyée. Réessayez plus tard.";
 
@@ -97,7 +100,7 @@ test("6ᵉ envoi en 10 minutes → bandeau, saisie conservée, rien d'enregistr�
     await page.goto("/");
     await remplir(page, `${prefixe} Envoi ${i}`);
     await envoyer(page);
-    await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+    await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
     await expect(
       page.getByRole("heading", { level: 1, name: "Votre demande a bien été enregistrée." }),
     ).toBeVisible();
@@ -127,7 +130,7 @@ test("6ᵉ envoi en 10 minutes → bandeau, saisie conservée, rien d'enregistr�
   // Une autre connexion (autre IP) peut toujours déposer.
   await utiliserIpDeTest(page.context());
   await envoyer(page);
-  await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+  await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
   expect(await nombreDemandes(sixieme)).toBe(1);
 });
 

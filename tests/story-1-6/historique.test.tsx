@@ -65,8 +65,8 @@ describe("historique — phrases des 10 types", () => {
       "Karim Benali a changé le statut : Nouvelle → En cours",
     ],
     [
-      ligne("classement_sans_suite", { ancienneValeur: "en_cours", nouvelleValeur: "traitee" }),
-      "Karim Benali a classé la demande sans suite",
+      ligne("classement_sans_suite", { ancienneValeur: "nouvelle", nouvelleValeur: "traitee" }),
+      "Classée sans suite par Karim Benali : Nouvelle → Traitée",
     ],
     [
       ligne("changement_priorite", { ancienneValeur: "normale", nouvelleValeur: "haute" }),

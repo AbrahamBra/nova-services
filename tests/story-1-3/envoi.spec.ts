@@ -90,6 +90,9 @@ const ANNEE_PARIS = new Intl.DateTimeFormat("fr-FR", {
 const FORMAT_REFERENCE = new RegExp(`^NOVA-${ANNEE_PARIS}-\\d{4,}$`);
 
 const ADRESSE_CONFIRMATION = /\/confirmation\/[0-9a-f]{64}$/;
+// Dépôt complet (base, email, page de confirmation) : plus de 5 s quand toute
+// la suite tourne en parallèle sur le serveur de développement.
+const ATTENTE_DEPOT = { timeout: 20_000 };
 
 test.describe("envoi d'une demande", () => {
   test.beforeEach(async ({ page }) => {
@@ -119,7 +122,7 @@ test.describe("envoi d'une demande", () => {
     await expect(enCours).toBeVisible();
     await expect(enCours).toBeDisabled();
 
-    await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+    await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
     await expect(
       page.getByRole("heading", { level: 1, name: "Votre demande a bien été enregistrée." }),
     ).toBeVisible();
@@ -189,7 +192,7 @@ test.describe("envoi d'une demande", () => {
     const s2 = nouvelleSaisie(testInfo.project.name);
     await remplir(page, s2);
     await page.getByRole("button", { name: "Envoyer ma demande" }).click();
-    await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+    await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
     expect(page.url()).not.toBe(premiereAdresse);
     const secondeReference = await page.getByText(FORMAT_REFERENCE).innerText();
     expect(secondeReference).not.toBe(premiereReference);
@@ -269,7 +272,7 @@ test.describe("envoi d'une demande", () => {
 
     await page.unroute("**/*", couper);
     await bandeau.getByRole("button", { name: "Réessayer" }).click();
-    await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+    await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
   });
 
   test("parcours au clavier seul, avec un focus toujours visible", async ({ page }, testInfo) => {
@@ -319,7 +322,7 @@ test.describe("envoi d'une demande", () => {
     await expect(page.getByRole("button", { name: "Envoyer ma demande" })).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+    await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
     await expect(
       page.getByRole("heading", { level: 1, name: "Votre demande a bien été enregistrée." }),
     ).toBeVisible();
@@ -402,7 +405,7 @@ test.describe("page de confirmation", () => {
     await page.goto("/");
     await remplir(page, nouvelleSaisie(testInfo.project.name));
     await page.getByRole("button", { name: "Envoyer ma demande" }).click();
-    await expect(page).toHaveURL(ADRESSE_CONFIRMATION);
+    await expect(page).toHaveURL(ADRESSE_CONFIRMATION, ATTENTE_DEPOT);
     await expect(page.getByRole("button", { name: "Copier" })).toBeVisible();
 
     const resultats = await new AxeBuilder({ page }).analyze();

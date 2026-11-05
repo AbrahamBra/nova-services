@@ -398,7 +398,8 @@ describe("base — blocage après 5 échecs de suite en 15 minutes", () => {
       expect(await journalDeLaTransaction()).toHaveLength(2);
       expect((await erreurDe(commencer(email, ip))).message).toBe(BLOQUEE);
     });
-  });
+    // Une vingtaine d'allers-retours avec la base : plus de 5 s depuis la CI.
+  }, 20_000);
 
   it("erreur serveur : terminer_connexion(id, null) supprime la tentative, qui ne compte pas", async () => {
     await dansTransactionAnnulee(async () => {

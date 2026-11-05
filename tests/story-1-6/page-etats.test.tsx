@@ -134,10 +134,11 @@ describe("page /equipe/demandes/[reference] — états", () => {
     // Retour à la même page de la liste.
     expect(html).toContain('href="/equipe/demandes?page=2"');
     expect(html).toContain("← Retour aux demandes");
-    // Email envoyé : aucun bandeau ; demande En cours : aucune action dans
-    // le panneau, seul le bouton des notes internes (story 2.2).
+    // Email envoyé : aucun bandeau ; demande En cours : seuls le bouton des
+    // notes internes (story 2.2) et « Marquer comme traitée » (story 2.3).
     expect(html).not.toContain('data-testid="bandeau-email"');
-    expect(html.match(/<button\b/g)).toHaveLength(1);
+    expect(html.match(/<button\b/g)).toHaveLength(2);
+    expect(html).toMatch(/<button\b[^>]*>Marquer comme traitée<\/button>/);
     expect(html).toMatch(/<button\b[^>]*>Ajouter la note<\/button>/);
   });
 

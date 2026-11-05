@@ -23,6 +23,8 @@ import { Client } from "pg";
 // elle-même qu'il est actif) ; rien pour anon.
 // Story 2.2 : ajouter_note pour le membre connecté, et lecture de `notes`
 // colonne par colonne (aucune écriture directe) ; rien pour anon.
+// Story 2.3 : changer_statut et classer_sans_suite pour le membre connecté ;
+// rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -37,6 +39,8 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
+  "authenticated:fonction:public.changer_statut(p_demande_id uuid, p_statut text):EXECUTE",
+  "authenticated:fonction:public.classer_sans_suite(p_demande_id uuid, p_note text):EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
   "authenticated:table:public.demandes_liste:SELECT",
