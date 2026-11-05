@@ -78,3 +78,36 @@ export async function lireOptionsFiltres(): Promise<Resultat<OptionsFiltres>> {
   }
   return lireOptionsFiltresAvec(client);
 }
+
+/** Membre actif proposé dans la fenêtre « Attribuer à… » (story 2.7). */
+export type MembreActif = { id: string; nom: string };
+
+/**
+ * Membres actifs, par nom (story 2.7) : choix de la fenêtre « Attribuer à… ».
+ * Lecture propre (avec la session, RLS) : un échec de lecture des catégories
+ * ne rend pas la liste des membres indisponible. Jamais de compte désactivé
+ * ou invité.
+ */
+export async function lireMembresActifs(): Promise<Resultat<MembreActif[]>> {
+  try {
+    const client = await creerClientServeur();
+    const { data, error } = await client
+      .from("membres")
+      .select("id, nom")
+      .eq("etat", "actif")
+      .order("nom", { ascending: true });
+    if (error || !data) {
+      console.error(`[membres] lecture des membres actifs impossible : code=${error?.code ?? "aucun"}`);
+      return ECHEC;
+    }
+    return {
+      ok: true,
+      donnees: (data as Ligne[])
+        .filter((l) => typeof l?.id === "string" && typeof l.nom === "string")
+        .map((l) => ({ id: l!.id as string, nom: l!.nom as string })),
+    };
+  } catch {
+    console.error("[membres] exception pendant la lecture des membres actifs");
+    return ECHEC;
+  }
+}

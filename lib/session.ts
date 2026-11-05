@@ -10,13 +10,20 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 // `mon_profil()` (AD-3) : jamais dans les métadonnées Auth.
 // `null` : pas de session, ou compte qui n'est pas un membre actif.
 
-export type Profil = {
+export type ProfilMembre = {
   nom: string;
   role: Role;
   /** Premier mot du nom, pour « Bonjour [prénom] ». */
   prenom: string;
   estAdmin: boolean;
 };
+
+/**
+ * Profil de la session : avec l'identifiant du membre (story 2.7, pour savoir
+ * si je suis le responsable d'une demande), tiré de la session vérifiée
+ * (`sub` des claims, le même identifiant que `auth.uid()` et `membres.id`).
+ */
+export type Profil = ProfilMembre & { id: string };
 
 const ECHEC = {
   ok: false,
@@ -29,7 +36,7 @@ export function prenomDe(nom: string): string {
 }
 
 /** Valide la réponse de `mon_profil()` : membre actif, ou null. */
-export function lireReponseProfil(valeur: unknown): Profil | null | undefined {
+export function lireReponseProfil(valeur: unknown): ProfilMembre | null | undefined {
   if (valeur === null) return null;
   if (typeof valeur !== "object") return undefined;
   const v = valeur as Record<string, unknown>;
@@ -46,7 +53,7 @@ export function lireReponseProfil(valeur: unknown): Profil | null | undefined {
 }
 
 /** Appelle `mon_profil()` avec un client porteur de la session. */
-export async function profilDuClient(client: ClientRpc): Promise<Resultat<Profil | null>> {
+export async function profilDuClient(client: ClientRpc): Promise<Resultat<ProfilMembre | null>> {
   const resultat = await appeler<unknown>(client, "mon_profil");
   if (!resultat.ok) return resultat;
   const profil = lireReponseProfil(resultat.donnees);
@@ -70,6 +77,7 @@ export const lireProfil = cache(async (): Promise<Resultat<Profil | null>> => {
     return ECHEC;
   }
 
+  let id: unknown;
   // Session vérifiée (signature du jeton) avant d'interroger la base.
   // Seule une session absente ou invalide donne « pas de profil » ; une
   // panne passagère (réseau, Auth indisponible) est une erreur, pour ne pas
@@ -84,10 +92,15 @@ export const lireProfil = cache(async (): Promise<Resultat<Profil | null>> => {
       return { ok: true, donnees: null };
     }
     if (!data?.claims) return { ok: true, donnees: null };
+    id = data.claims.sub;
   } catch {
     console.error("[session] exception pendant getClaims");
     return ECHEC;
   }
+  if (typeof id !== "string" || id === "") return { ok: true, donnees: null };
 
-  return profilDuClient(client);
+  const profil = await profilDuClient(client);
+  if (!profil.ok) return profil;
+  if (profil.donnees === null) return { ok: true, donnees: null };
+  return { ok: true, donnees: { ...profil.donnees, id } };
 });

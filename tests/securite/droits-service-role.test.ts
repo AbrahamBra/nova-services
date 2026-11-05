@@ -89,6 +89,17 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows[0].peut).toBe(false);
   });
 
+  // Story 2.7 : libérer et attribuer sont réservées aux membres connectés
+  // (session), jamais à la clé secrète.
+  it("aucun droit sur liberer ni attribuer", async () => {
+    const { rows } = await client.query<{ fonction: string }>(
+      `select f.fonction
+       from unnest(array['public.liberer(uuid)', 'public.attribuer(uuid, uuid)']) as f(fonction)
+       where has_function_privilege('service_role', f.fonction, 'EXECUTE')`,
+    );
+    expect(rows.map((ligne) => ligne.fonction)).toEqual([]);
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

@@ -96,3 +96,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-6-saisir-une-demande.md`
   summary: `FormulaireSaisie` n'a pas de test de composant (synchronisation des réponses, effacement des erreurs, garde du double clic).
   evidence: aucun banc de test de composants client dans le projet ; seul le navigateur couvre ce formulaire.
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-7-liberer-ou-attribuer.md`
+  summary: Les états « Liste des membres indisponible. » et « Aucun autre membre actif. » de la fenêtre d'attribution n'ont pas de test.
+  evidence: difficile à provoquer contre la base partagée ; un test unitaire de `actionsPermises` avec lectures simulées suffirait.
