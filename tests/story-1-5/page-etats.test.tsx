@@ -21,6 +21,16 @@ vi.mock("@/lib/demandes", () => ({
   },
 }));
 
+// Story 2.5 : choix de la barre de filtres (catégories, membres).
+vi.mock("@/lib/options-filtres", () => ({
+  lireOptionsFiltres: async () => ({ ok: true, donnees: { categories: [], membres: [] } }),
+}));
+
+vi.mock("next/navigation", async (importer) => ({
+  ...(await importer<typeof import("next/navigation")>()),
+  useRouter: () => ({ push: () => {}, refresh: () => {} }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: Record<string, unknown>) => (
     <a href={String(href)} className={className as string | undefined}>

@@ -17,8 +17,8 @@ import { formaterDateHeure } from "@/lib/format";
 // responsable peut se couper.
 
 /**
- * Adresse du détail. Le numéro de page (et, plus tard, les filtres) de la
- * liste est transmis, pour que « ← Retour aux demandes » y ramène.
+ * Adresse du détail. Les filtres et le numéro de page de la liste sont
+ * transmis, pour que « ← Retour aux demandes » y ramène (story 2.5).
  */
 export function adresseDetail(
   reference: string,

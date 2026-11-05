@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Client } from "pg";
-import type { Priorite, Statut } from "@/lib/domaine";
+import type { Canal, Priorite, Statut } from "@/lib/domaine";
 import { empreinteDeTest } from "./ip-test";
 
 // Demandes jetables pour les tests de la liste (story 1.5). Créées par
@@ -20,6 +20,14 @@ export type DemandeTest = {
 
 export type OptionsDemande = {
   objet?: string;
+  /** Nom du demandeur, après le préfixe (story 2.5). Par défaut « Sophie Garnier ». */
+  nomDemandeur?: string;
+  /** Email du demandeur (story 2.5). */
+  email?: string;
+  /** Canal (story 2.5) ; « formulaire » par défaut. */
+  canal?: Canal;
+  /** Catégorie, même désactivée (story 2.5) ; la première catégorie active par défaut. */
+  categorieId?: string;
   societe?: string | null;
   statut?: Statut;
   priorite?: Priorite;
@@ -45,7 +53,7 @@ export async function creerDemandeTest(
   options: OptionsDemande = {},
 ): Promise<DemandeTest> {
   const categorie = await premiereCategorie(base);
-  const nom = `${prefixe} Sophie Garnier`;
+  const nom = `${prefixe} ${options.nomDemandeur ?? "Sophie Garnier"}`;
   const objet = options.objet ?? `Demande de test ${randomUUID().slice(0, 6)}`;
   const societe = options.societe === undefined ? "Atelier Garnier" : options.societe;
   const { rows } = await base.query<{ r: { reference: string } }>(
@@ -53,7 +61,7 @@ export async function creerDemandeTest(
     [
       randomUUID(),
       nom,
-      "sophie.garnier@example.com",
+      options.email ?? "sophie.garnier@example.com",
       societe,
       categorie.id,
       objet,
@@ -67,7 +75,9 @@ export async function creerDemandeTest(
         set cree_le = now() + $2::interval,
             statut = $3,
             priorite = $4,
-            responsable_id = $5
+            responsable_id = $5,
+            canal = $6,
+            categorie_id = $7
       where reference = $1
       returning id`,
     [
@@ -76,6 +86,8 @@ export async function creerDemandeTest(
       options.statut ?? "nouvelle",
       options.priorite ?? "normale",
       options.responsableId ?? null,
+      options.canal ?? "formulaire",
+      options.categorieId ?? categorie.id,
     ],
   );
   // La ligne `creation` de l'historique suit la date de création décalée

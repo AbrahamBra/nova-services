@@ -14,7 +14,7 @@ import { BoutonReessayer } from "@/components/nova/reessayer";
 import { lireCategoriesActives, type CategoriesDetail } from "@/lib/categories";
 import { lireDetail, type DetailDemande } from "@/lib/detail-demande";
 import { LIBELLES_CANAL, type EtatEmail } from "@/lib/domaine";
-import { adresseAvecPage, lireNumeroPage } from "@/lib/filtres";
+import { adresseListe, lireFiltres, lireNumeroPage } from "@/lib/filtres";
 import { formaterDateHeure } from "@/lib/format";
 
 // Détail d'une demande (EXPERIENCE.md §9.5, maquette key-detail-demande.html,
@@ -280,8 +280,8 @@ export default async function PageDetailDemande({
 }: PageProps<"/equipe/demandes/[reference]">) {
   const [{ reference: brute }, parametres] = await Promise.all([params, searchParams]);
   const reference = decoder(brute);
-  // Retour à la même page de la liste (et, plus tard, aux mêmes filtres).
-  const retour = adresseAvecPage(CHEMIN_LISTE, parametres, lireNumeroPage(parametres.page));
+  // Retour à la même page de la liste, avec les mêmes filtres (story 2.5).
+  const retour = adresseListe(CHEMIN_LISTE, lireFiltres(parametres), lireNumeroPage(parametres.page));
   const resultat = await lireDetail(reference);
 
   const lienRetour = (

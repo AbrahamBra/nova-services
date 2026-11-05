@@ -2,7 +2,16 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CANAUX, PRIORITES, STATUTS, type Canal, type Priorite, type Statut } from "@/lib/domaine";
 import { messageErreur } from "@/lib/erreurs";
-import { TAILLE_PAGE, TRI_PAR_DEFAUT, bornerPage, intervalle } from "@/lib/filtres";
+import {
+  RESPONSABLE_MOI,
+  TAILLE_PAGE,
+  TRI_PAR_DEFAUT,
+  bornerPage,
+  conditionsDesFiltres,
+  intervalle,
+  type Condition,
+  type Filtres,
+} from "@/lib/filtres";
 import type { Resultat } from "@/lib/server/appeler";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
@@ -10,6 +19,12 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 // `demandes_liste`, lue avec la SESSION de la personne connectée (jamais la
 // clé secrète). RLS et droits par colonne font le tri : un compte qui n'est
 // pas membre actif ne lit aucune ligne.
+// Story 2.5 : filtres de l'adresse traduits par lib/filtres.ts ; avec une
+// recherche texte, les lignes viennent de `rechercher_demandes(q)` : la vue
+// elle-même (RLS appliquée), restreinte aux identifiants trouvés par
+// `ids_demandes_recherche` (migration 0019) ; filtres, tri, comptage et
+// pagination s'appliquent à la vue, comme sans recherche.
+// Le total et la pagination portent sur la liste filtrée.
 
 export type LigneDemande = {
   id: string;
@@ -27,7 +42,7 @@ export type LigneDemande = {
 
 export type PageDemandes = {
   lignes: LigneDemande[];
-  /** Nombre total de demandes visibles. */
+  /** Nombre total de demandes visibles (avec les filtres). */
   total: number;
   /** Page réellement affichée (ramenée à la dernière page si hors bornes). */
   page: number;
@@ -112,47 +127,82 @@ type Reponse = {
   error: { code?: string } | null;
 };
 
-async function lirePage(client: SupabaseClient, page: number): Promise<Reponse> {
+/** Requête filtrée (vue, ou recherche texte), sans tri ni pagination. */
+function requeteFiltree(client: SupabaseClient, filtres: Filtres, conditions: Condition[]) {
+  let requete = filtres.q
+    ? client.rpc("rechercher_demandes", { p_texte: filtres.q }, { count: "exact" }).select(COLONNES)
+    : client.from("demandes_liste").select(COLONNES, { count: "exact" });
+  for (const condition of conditions) {
+    if (condition.operateur === "eq") requete = requete.eq(condition.colonne, condition.valeur);
+    else if (condition.operateur === "in") requete = requete.in(condition.colonne, condition.valeurs);
+    else requete = requete.is(condition.colonne, null);
+  }
+  return requete;
+}
+
+async function lirePage(
+  client: SupabaseClient,
+  page: number,
+  filtres: Filtres,
+  conditions: Condition[],
+): Promise<Reponse> {
   const { de, a } = intervalle(page, TAILLE_PAGE);
-  const { data, count, error } = await client
-    .from("demandes_liste")
-    .select(COLONNES, { count: "exact" })
+  const { data, count, error } = await requeteFiltree(client, filtres, conditions)
     .order(TRI_PAR_DEFAUT.colonne, { ascending: TRI_PAR_DEFAUT.croissant })
     .order("id", { ascending: false })
     .range(de, a);
-  return { data, count, error };
+  // Toujours un tableau (vue ou fonction « setof ») ; vérifié par lireDemandesAvec.
+  return { data: data as unknown[] | null, count, error };
 }
 
-async function compter(client: SupabaseClient): Promise<number | null> {
-  const { count, error } = await client
-    .from("demandes_liste")
-    .select("id", { count: "exact", head: true });
+async function compter(
+  client: SupabaseClient,
+  filtres: Filtres,
+  conditions: Condition[],
+): Promise<number | null> {
+  const { count, error } = await requeteFiltree(client, filtres, conditions).range(0, 0);
   return error ? null : count;
 }
 
+/** Identifiant du membre connecté (« Mes demandes »), ou null. */
+async function membreConnecte(client: SupabaseClient): Promise<string | null> {
+  const { data, error } = await client.auth.getClaims();
+  const sub = data?.claims?.sub;
+  return !error && typeof sub === "string" && sub !== "" ? sub : null;
+}
+
 /**
- * Lit une page de la liste avec un client porteur de la session. Une page
- * au-delà de la fin est ramenée à la dernière page.
+ * Lit une page de la liste filtrée avec un client porteur de la session. Une
+ * page au-delà de la fin est ramenée à la dernière page.
  */
 export async function lireDemandesAvec(
   client: SupabaseClient,
   pageDemandee: number,
+  filtres: Filtres = {},
 ): Promise<Resultat<PageDemandes>> {
   try {
+    const membreId =
+      filtres.responsable === RESPONSABLE_MOI ? await membreConnecte(client) : null;
+    if (filtres.responsable === RESPONSABLE_MOI && membreId === null) {
+      console.error("[demandes] membre connecté introuvable pour « Mes demandes »");
+      return ECHEC;
+    }
+    const conditions = conditionsDesFiltres(filtres, membreId);
+
     let page = Math.max(1, Math.trunc(pageDemandee));
-    let reponse = await lirePage(client, page);
+    let reponse = await lirePage(client, page, filtres, conditions);
 
     const horsBornes =
       reponse.error?.code === HORS_BORNES ||
       (!reponse.error && page > 1 && (reponse.data?.length ?? 0) === 0);
     if (horsBornes) {
-      const total = reponse.error ? await compter(client) : reponse.count;
+      const total = reponse.error ? await compter(client, filtres, conditions) : reponse.count;
       if (total === null) {
         console.error("[demandes] comptage impossible");
         return ECHEC;
       }
       page = bornerPage(page, total, TAILLE_PAGE);
-      reponse = await lirePage(client, page);
+      reponse = await lirePage(client, page, filtres, conditions);
     }
 
     if (reponse.error || !Array.isArray(reponse.data) || reponse.count === null) {
@@ -175,8 +225,11 @@ export async function lireDemandesAvec(
   }
 }
 
-/** Page de la liste pour la personne connectée (pages de l'espace équipe). */
-export async function lireDemandes(page: number): Promise<Resultat<PageDemandes>> {
+/** Page de la liste filtrée pour la personne connectée (pages de l'espace équipe). */
+export async function lireDemandes(
+  page: number,
+  filtres: Filtres = {},
+): Promise<Resultat<PageDemandes>> {
   let client;
   try {
     client = await creerClientServeur();
@@ -184,5 +237,5 @@ export async function lireDemandes(page: number): Promise<Resultat<PageDemandes>
     console.error("[demandes] client serveur indisponible");
     return ECHEC;
   }
-  return lireDemandesAvec(client, page);
+  return lireDemandesAvec(client, page, filtres);
 }
