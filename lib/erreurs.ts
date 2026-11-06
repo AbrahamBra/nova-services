@@ -52,6 +52,12 @@ export const MESSAGES_ERREUR = {
   // n'est créée, jamais un lien faux (propre à l'application).
   ADRESSE_SITE_MANQUANTE:
     "L'adresse du site n'est pas configurée (NEXT_PUBLIC_SITE_URL) : aucune invitation n'a été créée.",
+  // Story 4.2 — modifier, désactiver, réactiver un compte (modifier_membre,
+  // desactiver_membre, reactiver_membre, verifier_email_libre).
+  DERNIER_ADMIN: "Il doit rester au moins un administrateur actif.",
+  PROPRE_COMPTE: "Vous ne pouvez ni désactiver votre propre compte ni changer votre propre rôle.",
+  ETAT_COMPTE_INVALIDE: "Cette action n'est pas possible pour l'état actuel de ce compte.",
+  COMPTE_DESACTIVE: "Cette adresse appartient à un compte désactivé.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;

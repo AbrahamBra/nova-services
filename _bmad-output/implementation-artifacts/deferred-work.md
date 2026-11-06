@@ -107,3 +107,13 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-1-inviter-un-membre.md`
   summary: Deux invitations simultanées de la même adresse (ou une horloge serveur en avance de plus de 2 min) peuvent remplacer le jeton du premier lien, voire supprimer un compte Auth créé par l'autre appel.
   evidence: non vérifié (medium s'il est réel) ; à trancher par un test qui lance deux `inviter` en parallèle sur la même adresse, et corriger par un verrou par adresse (advisory lock) avant `generateLink`.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-modifier-desactiver-reactiver.md`
+  summary: Désactiver et réactiver le même compte au même instant peut laisser un compte actif dans la base mais bloqué dans Auth.
+  evidence: non vérifié (medium s'il est réel) ; désactiver = base puis Auth, réactiver = Auth puis base ; à trancher par un test qui entrelace les deux actions, corriger en relisant l'état avant d'agir sur Auth ou en sérialisant.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-modifier-desactiver-reactiver.md`
+  summary: La branche DERNIER_ADMIN de modifier_membre et desactiver_membre n'est jamais exécutée par un test.
+  evidence: non vérifié (medium s'il est réel) ; inatteignable sur la base partagée ; à prouver sur une base locale jetable (supabase start) où les seuls administrateurs sont des comptes de test.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-2-modifier-desactiver-reactiver.md`
+  summary: Une prise en charge au même instant qu'une désactivation peut laisser une demande En cours au nom d'un compte désactivé.
+  evidence: non vérifié (medium s'il est réel) ; `prendre_en_charge` ne verrouille pas la ligne `membres` ; à corriger par un `for share` sur le membre dans `prendre_en_charge`.
