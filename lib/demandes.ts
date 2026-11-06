@@ -127,11 +127,23 @@ type Reponse = {
   error: { code?: string } | null;
 };
 
-/** Requête filtrée (vue, ou recherche texte), sans tri ni pagination. */
-function requeteFiltree(client: SupabaseClient, filtres: Filtres, conditions: Condition[]) {
+/**
+ * Requête filtrée (vue, ou recherche texte), sans tri ni pagination. En
+ * `comptage` (story 2.8 : tableau de bord, compteur du menu), mêmes filtres
+ * et mêmes conditions, sans aucune ligne renvoyée (`head`).
+ */
+function requeteFiltree(
+  client: SupabaseClient,
+  filtres: Filtres,
+  conditions: Condition[],
+  comptage = false,
+) {
+  const colonnes: string = comptage ? "id" : COLONNES;
   let requete = filtres.q
-    ? client.rpc("rechercher_demandes", { p_texte: filtres.q }, { count: "exact" }).select(COLONNES)
-    : client.from("demandes_liste").select(COLONNES, { count: "exact" });
+    ? client
+        .rpc("rechercher_demandes", { p_texte: filtres.q }, { count: "exact", head: comptage })
+        .select(colonnes)
+    : client.from("demandes_liste").select(colonnes, { count: "exact", head: comptage });
   for (const condition of conditions) {
     if (condition.operateur === "eq") requete = requete.eq(condition.colonne, condition.valeur);
     else if (condition.operateur === "in") requete = requete.in(condition.colonne, condition.valeurs);
@@ -145,8 +157,9 @@ async function lirePage(
   page: number,
   filtres: Filtres,
   conditions: Condition[],
+  taillePage: number,
 ): Promise<Reponse> {
-  const { de, a } = intervalle(page, TAILLE_PAGE);
+  const { de, a } = intervalle(page, taillePage);
   const { data, count, error } = await requeteFiltree(client, filtres, conditions)
     .order(TRI_PAR_DEFAUT.colonne, { ascending: TRI_PAR_DEFAUT.croissant })
     .order("id", { ascending: false })
@@ -172,25 +185,39 @@ async function membreConnecte(client: SupabaseClient): Promise<string | null> {
 }
 
 /**
+ * Conditions des filtres (lib/filtres.ts) ; pour « Mes demandes », avec le
+ * membre connecté. `null` si ce membre est introuvable.
+ */
+async function conditionsPour(
+  client: SupabaseClient,
+  filtres: Filtres,
+): Promise<Condition[] | null> {
+  const membreId =
+    filtres.responsable === RESPONSABLE_MOI ? await membreConnecte(client) : null;
+  if (filtres.responsable === RESPONSABLE_MOI && membreId === null) {
+    console.error("[demandes] membre connecté introuvable pour « Mes demandes »");
+    return null;
+  }
+  return conditionsDesFiltres(filtres, membreId);
+}
+
+/**
  * Lit une page de la liste filtrée avec un client porteur de la session. Une
- * page au-delà de la fin est ramenée à la dernière page.
+ * page au-delà de la fin est ramenée à la dernière page. `taillePage` : 25
+ * pour la liste ; le tableau de bord (story 2.8) lit les 5 premières lignes.
  */
 export async function lireDemandesAvec(
   client: SupabaseClient,
   pageDemandee: number,
   filtres: Filtres = {},
+  taillePage: number = TAILLE_PAGE,
 ): Promise<Resultat<PageDemandes>> {
   try {
-    const membreId =
-      filtres.responsable === RESPONSABLE_MOI ? await membreConnecte(client) : null;
-    if (filtres.responsable === RESPONSABLE_MOI && membreId === null) {
-      console.error("[demandes] membre connecté introuvable pour « Mes demandes »");
-      return ECHEC;
-    }
-    const conditions = conditionsDesFiltres(filtres, membreId);
+    const conditions = await conditionsPour(client, filtres);
+    if (conditions === null) return ECHEC;
 
     let page = Math.max(1, Math.trunc(pageDemandee));
-    let reponse = await lirePage(client, page, filtres, conditions);
+    let reponse = await lirePage(client, page, filtres, conditions, taillePage);
 
     const horsBornes =
       reponse.error?.code === HORS_BORNES ||
@@ -201,8 +228,8 @@ export async function lireDemandesAvec(
         console.error("[demandes] comptage impossible");
         return ECHEC;
       }
-      page = bornerPage(page, total, TAILLE_PAGE);
-      reponse = await lirePage(client, page, filtres, conditions);
+      page = bornerPage(page, total, taillePage);
+      reponse = await lirePage(client, page, filtres, conditions, taillePage);
     }
 
     if (reponse.error || !Array.isArray(reponse.data) || reponse.count === null) {
@@ -217,7 +244,7 @@ export async function lireDemandesAvec(
 
     return {
       ok: true,
-      donnees: { lignes, total: reponse.count, page, taillePage: TAILLE_PAGE },
+      donnees: { lignes, total: reponse.count, page, taillePage },
     };
   } catch {
     console.error("[demandes] exception pendant la lecture");
@@ -229,6 +256,7 @@ export async function lireDemandesAvec(
 export async function lireDemandes(
   page: number,
   filtres: Filtres = {},
+  taillePage: number = TAILLE_PAGE,
 ): Promise<Resultat<PageDemandes>> {
   let client;
   try {
@@ -237,5 +265,30 @@ export async function lireDemandes(
     console.error("[demandes] client serveur indisponible");
     return ECHEC;
   }
-  return lireDemandesAvec(client, page, filtres);
+  return lireDemandesAvec(client, page, filtres, taillePage);
+}
+
+/**
+ * Nombre de demandes de la liste filtrée (story 2.8 : chiffres du tableau de
+ * bord et compteur du menu), avec un client porteur de la session. Mêmes
+ * conditions que la liste (`conditionsDesFiltres`, AD-25) : le chiffre est
+ * exactement le total de la liste ouverte avec ces filtres.
+ */
+export async function compterDemandesAvec(
+  client: SupabaseClient,
+  filtres: Filtres = {},
+): Promise<Resultat<number>> {
+  try {
+    const conditions = await conditionsPour(client, filtres);
+    if (conditions === null) return ECHEC;
+    const { count, error } = await requeteFiltree(client, filtres, conditions, true);
+    if (error || typeof count !== "number") {
+      console.error(`[demandes] comptage impossible : code=${error?.code ?? "aucun"}`);
+      return ECHEC;
+    }
+    return { ok: true, donnees: count };
+  } catch {
+    console.error("[demandes] exception pendant le comptage");
+    return ECHEC;
+  }
 }

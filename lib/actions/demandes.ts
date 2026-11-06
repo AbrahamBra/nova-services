@@ -35,6 +35,7 @@ import {
 } from "@/lib/schemas/saisie";
 import { PRIORITES, STATUTS, type Priorite, type Statut } from "@/lib/domaine";
 import { creerClientServeur } from "@/lib/supabase/serveur";
+import { lireCompteurMenu } from "@/lib/tableau-de-bord";
 
 // Actions serveur sur les demandes (AD-7). Story 1.3 : dépôt public ;
 // story 1.7 : email de confirmation ; story 1.8 : champ piège et limite
@@ -853,4 +854,15 @@ export async function saisir(etat: EtatSaisie, formulaire: FormData): Promise<Et
   }
 
   return { erreurs: {}, erreurGenerale: null, tentative: etat.tentative + 1, reference };
+}
+
+/**
+ * Compteur du menu (story 2.8) : demandes « À prendre en charge », relu par
+ * le menu à chaque changement de page (la mise en page n'est pas rendue de
+ * nouveau lors d'une navigation dans l'application). Lu avec la session :
+ * sans membre actif, la vue ne renvoie rien. `null` en cas d'erreur (le
+ * compteur est alors masqué).
+ */
+export async function lireCompteurDemandes(): Promise<number | null> {
+  return lireCompteurMenu();
 }

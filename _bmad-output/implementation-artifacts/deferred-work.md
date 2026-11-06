@@ -99,3 +99,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-7-liberer-ou-attribuer.md`
   summary: Les états « Liste des membres indisponible. » et « Aucun autre membre actif. » de la fenêtre d'attribution n'ont pas de test.
   evidence: difficile à provoquer contre la base partagée ; un test unitaire de `actionsPermises` avec lectures simulées suffirait.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-8-tableau-de-bord.md`
+  summary: « Copier le lien » (tableau de bord vide) n'a aucun test au clic : adresse copiée (`origin + "/"`) et libellés « Lien copié » / « Copie impossible ».
+  evidence: l'état vide est inatteignable sur la base partagée des tests navigateur, et vitest tourne en environnement `node` (pas de banc de composants).
