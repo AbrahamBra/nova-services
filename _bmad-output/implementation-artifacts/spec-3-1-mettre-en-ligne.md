@@ -2,7 +2,7 @@
 title: 'Story 3.1 — Mettre l''application en ligne'
 type: 'feature'
 created: '2026-11-05'
-status: 'in-review'
+status: 'done'
 baseline_commit: '8e5318cc5af34ab9b0e73d1a3d90b89b74559c15'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -91,6 +91,8 @@ context:
 - La branche contient déjà les stories 3.2, 3.3 et 3.6 (commitées) et est à jour avec `main` (story 2.1). Les tests du navigateur tournent sur le port 3210 (`playwright.config.ts`). Ne jamais lancer de test contre la production ; `.env.scripts-production.local` n'existe pas encore (créé plus tard par Abraham) : les tests des scripts utilisent des fichiers temporaires fictifs.
 
 - 05/11/2026 : base de production prête (migrations appliquées, administrateur créé, secret `PROD_SUPABASE_DB_URL` posé) par Abraham. Code commité avant la mise en ligne ; restent la fusion dans `main`, le site Netlify, l'étiquette `v1.0.0`, la protection de `main` et les vérifications à l'écran.
+
+- 06/11/2026 : mise en ligne faite. PR n° 6 (exclusion de `.netlify/`) fusionnée ; production publiée depuis `main` e980271 et vérifiée par Abraham ; étiquette `v1.0.0` ; ruleset GitHub « Protéger main » actif (PR obligatoire, « Lint, typage, Vitest, Playwright » et « Recherche de secrets (gitleaks) » requis, ni suppression ni réécriture).
 
 ## Spec Change Log
 
