@@ -7,8 +7,8 @@ import { PARAMETRE_EXPIREE } from "@/lib/supabase/proxy";
 import { lireProfil } from "@/lib/session";
 
 // Page « Connexion » (EXPERIENCE.md §9.12) : colonne centrée, logo, un
-// formulaire court. Pas d'inscription libre ni de mot de passe oublié
-// (epic 4). L'adresse de retour n'est suivie que si elle commence par
+// formulaire court. Pas d'inscription libre ; lien « Mot de passe oublié »
+// (story 4.3) sous le champ Mot de passe. L'adresse de retour n'est suivie que si elle commence par
 // `/equipe` (AD-28). Story 1.9 : `?expiree=1` (posé par proxy.ts après
 // 8 h de session) affiche « Votre session a expiré. Reconnectez-vous. ».
 export const dynamic = "force-dynamic";

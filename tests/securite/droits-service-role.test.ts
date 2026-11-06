@@ -25,6 +25,9 @@ const TABLES = [
   "notes",
   // Story 3.4 : registre des effacements, lu seulement par rejouer_effacements.
   "effacements",
+  // Story 4.3 : demandes « Mot de passe oublié », écrites seulement par
+  // demander_reinitialisation.
+  "demandes_reinitialisation",
 ];
 const DROITS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
 
@@ -149,6 +152,22 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows[0].peut).toBe(true);
   });
 
+  // Story 4.3 : la demande d'un lien passe par la clé secrète (action
+  // demanderLienMotDePasse) ; le lien généré par l'administrateur se note
+  // avec sa session, jamais avec la clé secrète.
+  it("demander_reinitialisation permise ; aucun droit sur noter_lien_mot_de_passe", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.demander_reinitialisation(text, text, text)',
+                         'public.noter_lien_mot_de_passe(uuid)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.demander_reinitialisation(text, text, text)": true,
+      "public.noter_lien_mot_de_passe(uuid)": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",
@@ -156,6 +175,7 @@ describe("sécurité — droits de service_role sur les tables", () => {
       "public.envois_formulaire_id_seq",
       "public.tentatives_connexion_id_seq",
       "public.notes_id_seq",
+      "public.demandes_reinitialisation_id_seq",
     ]) {
       const { rows } = await client.query<{ peut: boolean }>(
         `select has_sequence_privilege('service_role', $1, 'USAGE')

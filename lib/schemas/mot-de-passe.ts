@@ -99,10 +99,10 @@ export const ETAT_MOT_DE_PASSE_INITIAL: EtatMotDePasse = {
   tentative: 0,
 };
 
-// --- Lien d'invitation (/auth/confirmer) -----------------------------------
+// --- Lien d'invitation ou de réinitialisation (/auth/confirmer) ------------
 
-/** Types de lien acceptés par /auth/confirmer (story 4.3 : `recovery`). */
-export const TYPES_LIEN = ["invite"] as const;
+/** Types de lien acceptés par /auth/confirmer : invitation (4.1), réinitialisation (4.3). */
+export const TYPES_LIEN = ["invite", "recovery"] as const;
 export type TypeLien = (typeof TYPES_LIEN)[number];
 
 /** Jeton haché de Supabase : lettres, chiffres, « _ » et « - » ; longueur bornée. */
@@ -111,5 +111,96 @@ export const schemaLien = z.object({
   type: z.enum(TYPES_LIEN),
 });
 
-export type EtatConfirmation = { erreur: string | null; tentative: number };
+/** Type de lien lu dans une valeur quelconque (pour choisir le message), sinon null. */
+export function lireTypeLien(valeur: unknown): TypeLien | null {
+  return (TYPES_LIEN as readonly unknown[]).includes(valeur) ? (valeur as TypeLien) : null;
+}
+
+export type EtatConfirmation = {
+  erreur: string | null;
+  /** Vrai si le lien est refusé (invalide, expiré, déjà utilisé) : « Continuer » disparaît. */
+  lienRefuse?: boolean;
+  tentative: number;
+};
 export const ETAT_CONFIRMATION_INITIAL: EtatConfirmation = { erreur: null, tentative: 0 };
+
+/**
+ * Parcours de la page /nouveau-mot-de-passe : premier mot de passe d'un
+ * invité (4.1) ou nouveau mot de passe après un lien de réinitialisation
+ * (4.3). Envoyé par le formulaire seulement pour choisir le message « lien
+ * plus valable » : jamais pour décider d'un droit.
+ */
+export const PARCOURS_MOT_DE_PASSE = ["invitation", "reinitialisation"] as const;
+export type ParcoursMotDePasse = (typeof PARCOURS_MOT_DE_PASSE)[number];
+
+export function lireParcours(valeur: unknown): ParcoursMotDePasse {
+  return valeur === "reinitialisation" ? "reinitialisation" : "invitation";
+}
+
+// --- Mot de passe oublié (/mot-de-passe-oublie, story 4.3) -----------------
+
+/** Page publique de la demande d'un lien. */
+export const PAGE_MOT_DE_PASSE_OUBLIE = "/mot-de-passe-oublie";
+
+/** Message unique, que l'adresse corresponde à un compte ou non. */
+export const MESSAGE_DEMANDE_LIEN =
+  "Si un compte actif correspond à cette adresse, un email avec un lien valable 24 h vient de lui être envoyé. Sans email, demandez un lien à votre administrateur.";
+
+export const MESSAGES_DEMANDE_LIEN = {
+  emailVide: "Indiquez votre adresse email.",
+  emailInvalide: "Cette adresse email ne semble pas valide.",
+} as const;
+
+const LONGUEUR_MAX_EMAIL = 254;
+
+export const schemaDemandeLien = z.object({
+  // Espaces retirés et minuscules (AD-31).
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, MESSAGES_DEMANDE_LIEN.emailVide)
+    .refine(
+      (valeur) =>
+        valeur === "" || (valeur.length <= LONGUEUR_MAX_EMAIL && z.regexes.email.test(valeur)),
+      MESSAGES_DEMANDE_LIEN.emailInvalide,
+    ),
+});
+
+export type ErreursDemandeLien = { email?: string };
+
+export function lireSaisieDemandeLien(formulaire: FormData): { email: string } {
+  const valeur = formulaire.get("email");
+  return { email: typeof valeur === "string" ? valeur : "" };
+}
+
+export type VerificationDemandeLien =
+  | { ok: true; donnees: { email: string } }
+  | { ok: false; erreurs: ErreursDemandeLien };
+
+export function verifierDemandeLien(saisie: unknown): VerificationDemandeLien {
+  const resultat = schemaDemandeLien.safeParse(saisie);
+  if (resultat.success) return { ok: true, donnees: resultat.data };
+  const probleme = resultat.error.issues.find((p) => p.path[0] === "email");
+  return { ok: false, erreurs: { email: probleme?.message ?? MESSAGES_DEMANDE_LIEN.emailInvalide } };
+}
+
+/** État renvoyé par l'action `demanderLienMotDePasse` au formulaire (useActionState). */
+export type EtatDemandeLien = {
+  erreurs: ErreursDemandeLien;
+  /** Vrai après une demande acceptée : le message unique est affiché. */
+  envoyee: boolean;
+  /**
+   * Vrai seulement quand la demande n'a pas atteint le serveur (réseau,
+   * côté navigateur) : erreur générique avec « Réessayer ». Toute réponse du
+   * serveur donne le message unique.
+   */
+  echecEnvoi?: boolean;
+  tentative: number;
+};
+
+export const ETAT_DEMANDE_LIEN_INITIAL: EtatDemandeLien = {
+  erreurs: {},
+  envoyee: false,
+  tentative: 0,
+};

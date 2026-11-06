@@ -12,9 +12,9 @@ import {
 } from "react";
 import { unstable_rethrow } from "next/navigation";
 import { CLASSE_CHAMP, CLASSE_LIBELLE, MessageErreur } from "@/components/formulaire-depot";
-import { CopierReference } from "@/components/copier-reference";
 import { Bouton } from "@/components/nova/bouton";
 import { reactiverDepuisEcran } from "@/components/nova/comptes/actions-compte";
+import { ContenuLien } from "@/components/nova/comptes/fenetre-lien";
 import { useToasts } from "@/components/nova/toasts";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +34,6 @@ import { MESSAGES_COMPTE } from "@/lib/schemas/compte";
 import {
   ETAT_INVITATION_INITIAL,
   OPTIONS_ROLE,
-  RAPPEL_VALIDITE_LIEN,
   ROLE_PAR_DEFAUT,
   lireSaisieInvitation,
   premierChampInvitationEnErreur,
@@ -155,7 +154,14 @@ export function InviterMembre() {
             boutonRef.current?.focus();
           }}
         >
-          {invitation ? <ContenuLien invitation={invitation} /> : null}
+          {invitation ? (
+            <ContenuLien
+              titre="Lien d'invitation"
+              description={`${invitation.nom} a été invité. Aucun email n'est envoyé : copiez ce lien et transmettez-le-lui.`}
+              libelle="Lien d'invitation"
+              lien={invitation.lien}
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
@@ -381,40 +387,6 @@ function FormulaireInvitation({
           </Bouton>
         </DialogFooter>
       </form>
-    </>
-  );
-}
-
-function ContenuLien({ invitation }: { invitation: InvitationCreee }) {
-  const id = useId();
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Lien d&apos;invitation</DialogTitle>
-        <DialogDescription>
-          {`${invitation.nom} a été invité. Aucun email n'est envoyé : copiez ce lien et transmettez-le-lui.`}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="space-y-1.5">
-        <Label htmlFor={`${id}-lien`} className={CLASSE_LIBELLE}>
-          Lien d&apos;invitation
-        </Label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            id={`${id}-lien`}
-            readOnly
-            value={invitation.lien}
-            onFocus={(evenement) => evenement.currentTarget.select()}
-            aria-describedby={`${id}-rappel`}
-            className={`${CLASSE_CHAMP} min-w-0 flex-1 font-mono text-[13px] md:text-[13px]`}
-          />
-          <CopierReference reference={invitation.lien} />
-        </div>
-        <p id={`${id}-rappel`} className="text-[13px] text-muted-foreground">
-          {RAPPEL_VALIDITE_LIEN}
-        </p>
-      </div>
     </>
   );
 }

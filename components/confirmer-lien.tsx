@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef } from "react";
 import { unstable_rethrow } from "next/navigation";
+import { DemanderNouveauLien } from "@/components/lien-plus-valable";
 import { Bouton } from "@/components/nova/bouton";
 import { confirmerLien } from "@/lib/actions/comptes";
 import { messageErreur } from "@/lib/erreurs";
@@ -12,8 +13,10 @@ import {
 
 // Bouton « Continuer » de /auth/confirmer (story 4.1, décision d'Abraham) :
 // le lien n'est vérifié qu'au clic, par l'action serveur `confirmerLien`,
-// puis la page du mot de passe s'ouvre. Lien refusé : « Ce lien n'est plus
-// valable. Contactez votre administrateur. », le bouton disparaît.
+// puis la page du mot de passe s'ouvre. Lien refusé : « Continuer »
+// disparaît ; invitation : « Ce lien n'est plus valable. Contactez votre
+// administrateur. » ; réinitialisation (story 4.3) : « Ce lien n'est plus
+// valable. » et « Demander un nouveau lien ».
 
 async function envoyerAuServeur(
   etat: EtatConfirmation,
@@ -31,7 +34,7 @@ async function envoyerAuServeur(
 export function ConfirmerLien({ jeton, type }: { jeton: string; type: string }) {
   const [etat, envoyer, enCours] = useActionState(envoyerAuServeur, ETAT_CONFIRMATION_INITIAL);
   const alerteRef = useRef<HTMLDivElement>(null);
-  const lienRefuse = etat.erreur === messageErreur("LIEN_INVALIDE");
+  const lienRefuse = etat.lienRefuse === true;
 
   useEffect(() => {
     if (etat.erreur) alerteRef.current?.focus();
@@ -61,7 +64,11 @@ export function ConfirmerLien({ jeton, type }: { jeton: string; type: string }) 
         </div>
       ) : null}
 
-      {lienRefuse ? null : (
+      {lienRefuse ? (
+        type === "recovery" ? (
+          <DemanderNouveauLien className="w-full" />
+        ) : null
+      ) : (
         <Bouton type="submit" disabled={enCours} className="w-full">
           {enCours ? "Vérification…" : "Continuer"}
         </Bouton>

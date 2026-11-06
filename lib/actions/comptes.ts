@@ -1,7 +1,9 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { cookies, headers } from "next/headers";
 import { redirect, RedirectType } from "next/navigation";
+import { after } from "next/server";
 import { messageErreur } from "@/lib/erreurs";
 import {
   ACCUEIL_EQUIPE,
@@ -11,22 +13,36 @@ import {
   type EtatConnexion,
 } from "@/lib/schemas/connexion";
 import {
+  lireParcours,
+  lireSaisieDemandeLien,
   lireSaisieMotDePasse,
+  lireTypeLien,
   MESSAGES_MOT_DE_PASSE,
   schemaLien,
+  verifierDemandeLien,
   verifierMotDePasse,
   type EtatConfirmation,
+  type EtatDemandeLien,
   type EtatMotDePasse,
+  type TypeLien,
 } from "@/lib/schemas/mot-de-passe";
 import { lireAdresseIp } from "@/lib/server/adresse-ip";
 import { appeler, type ClientRpc } from "@/lib/server/appeler";
+import {
+  envoyerLienMotDePasse,
+  estAdresseAutorisee,
+  lireAdressesAutorisees,
+} from "@/lib/server/emails";
 import { empreinteEmail, empreinteIp } from "@/lib/server/empreintes";
+import { adresseDuSite, lienMotDePasse } from "@/lib/server/liens";
 import { creerClientService } from "@/lib/server/supabase-service";
 import { estPanneAuth, invitationDuClient, profilDuClient } from "@/lib/session";
+import { sessionParLien } from "@/lib/supabase/proxy";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur sur les comptes (AD-1, AD-7). Story 1.4 : connexion et
 // déconnexion. Story 4.1 : lien d'invitation et premier mot de passe.
+// Story 4.3 : mot de passe oublié (demande d'un lien, nouveau mot de passe).
 // Aucun client Supabase dans le navigateur : la session est
 // posée en cookies par le client serveur.
 // Story 1.9 : blocage après 5 échecs de suite en 15 minutes pour la même
@@ -95,11 +111,12 @@ async function effacerCookiesSession() {
  */
 async function empreintesDeConnexion(
   email: string,
+  contexte = "connexion",
 ): Promise<{ email: string; ip: string } | null> {
   try {
     const ip = lireAdresseIp(await headers());
     if (ip === null) {
-      console.error("[connexion] adresse IP introuvable dans les en-têtes");
+      console.error(`[${contexte}] adresse IP introuvable dans les en-têtes`);
       return null;
     }
     const empreinteDeLIp = empreinteIp(ip);
@@ -108,7 +125,7 @@ async function empreintesDeConnexion(
     return { email: empreinteDeLEmail, ip: empreinteDeLIp };
   } catch (erreur) {
     const nom = erreur instanceof Error ? erreur.name : typeof erreur;
-    console.error(`[connexion] exception pendant le calcul des empreintes : ${nom}`);
+    console.error(`[${contexte}] exception pendant le calcul des empreintes : ${nom}`);
     return null;
   }
 }
@@ -256,35 +273,59 @@ export async function deconnexion(): Promise<void> {
   redirect("/connexion", RedirectType.replace);
 }
 
-// --- Invitation : lien et premier mot de passe (story 4.1) -------------------
+// --- Liens : invitation (story 4.1) et mot de passe oublié (story 4.3) ------
 
 /** Page du choix du mot de passe, après le lien. */
 const PAGE_MOT_DE_PASSE = "/nouveau-mot-de-passe";
 
+/** Message « lien plus valable » selon le type de lien. */
+function messageLienInvalide(type: TypeLien | null): string {
+  return messageErreur(type === "recovery" ? "LIEN_REINITIALISATION_INVALIDE" : "LIEN_INVALIDE");
+}
+
+/** Trace une erreur imprévue (console et Sentry), sans email ni nom (AD-14). */
+function signaler(message: string): void {
+  console.error(message);
+  try {
+    Sentry.captureMessage(message, "error");
+  } catch {
+    // Le suivi des erreurs ne doit jamais faire échouer l'action.
+  }
+}
+
 /**
  * Bouton « Continuer » de /auth/confirmer : vérifie le lien côté serveur
- * (`verifyOtp`, client porteur de session : la session de l'invité est posée
+ * (`verifyOtp`, client porteur de session : la session du membre est posée
  * en cookies), puis mène à /nouveau-mot-de-passe. La page elle-même ne touche
  * jamais au lien (l'aperçu d'une messagerie ne le consomme pas).
- * Lien invalide, expiré ou déjà utilisé : « Ce lien n'est plus valable… ».
+ * Lien invalide, expiré ou déjà utilisé : « Ce lien n'est plus valable… »
+ * (invitation : « … Contactez votre administrateur. » ; réinitialisation :
+ * l'écran propose « Demander un nouveau lien »).
  */
 export async function confirmerLien(
   etat: EtatConfirmation,
   formulaire: FormData,
 ): Promise<EtatConfirmation> {
-  const lienInvalide = { erreur: messageErreur("LIEN_INVALIDE"), tentative: etat.tentative + 1 };
+  const suivant = etat.tentative + 1;
+  const lienInvalide = (type: TypeLien | null): EtatConfirmation => ({
+    erreur: messageLienInvalide(type),
+    lienRefuse: true,
+    tentative: suivant,
+  });
+  const serveur: EtatConfirmation = { erreur: messageErreur("ERREUR_INATTENDUE"), tentative: suivant };
+
   const lien = schemaLien.safeParse({
     token_hash: formulaire.get("token_hash"),
     type: formulaire.get("type"),
   });
-  if (!lien.success) return lienInvalide;
+  if (!lien.success) return lienInvalide(lireTypeLien(formulaire.get("type")));
 
   let client;
   try {
     client = await creerClientServeur();
   } catch {
     console.error("[confirmerLien] client serveur indisponible");
-    return { erreur: messageErreur("ERREUR_INATTENDUE"), tentative: etat.tentative + 1 };
+    return serveur;
   }
 
   try {
@@ -295,15 +336,15 @@ export async function confirmerLien(
     if (error) {
       if (estPanneAuth(error)) {
         console.error(`[confirmerLien] Auth indisponible : statut=${error.status ?? "aucun"}`);
-        return { erreur: messageErreur("ERREUR_INATTENDUE"), tentative: etat.tentative + 1 };
+        return serveur;
       }
-      // Jeton inconnu, expiré ou déjà utilisé (le code seul est tracé).
+      // Jeton inconnu, expiré, remplacé ou déjà utilisé (le code seul est tracé).
       console.warn(`[confirmerLien] lien refusé : code=${error.code ?? "inconnu"}`);
-      return lienInvalide;
+      return lienInvalide(lien.data.type);
     }
   } catch {
     console.error("[confirmerLien] exception pendant verifyOtp");
-    return { erreur: messageErreur("ERREUR_INATTENDUE"), tentative: etat.tentative + 1 };
+    return serveur;
   }
 
   redirect(PAGE_MOT_DE_PASSE, RedirectType.replace);
@@ -319,23 +360,31 @@ const CODES_SESSION_PERDUE = new Set([
 ]);
 
 /**
- * Premier mot de passe d'un membre invité (FR-8, story 4.1) : Zod (8
- * caractères minimum, confirmation identique) → session de l'invité
- * (`mon_invitation()`) → `auth.updateUser({ password })` (Supabase revérifie
- * la longueur) → `activer_mon_compte()` (`invite` → `actif`) → `/equipe`.
- * Sans session d'invitation : « Ce lien n'est plus valable… ». Déjà activé
- * (second envoi) : directement `/equipe`.
+ * Choix du mot de passe, après un lien (FR-8, stories 4.1 et 4.3) : Zod (8
+ * caractères minimum, confirmation identique) → session vérifiée →
+ *   - invité (`mon_invitation()`) : `auth.updateUser({ password })` puis
+ *     `activer_mon_compte()` (`invite` → `actif`) ;
+ *   - membre actif dont la session vient d'un lien ouvert il y a moins
+ *     d'une heure (`sessionParLien`, story 4.3) : `auth.updateUser`, puis
+ *     fermeture des autres sessions du compte ;
+ * puis `/equipe`. Session ouverte par mot de passe, lien trop ancien, compte
+ * désactivé ou sans session : « Ce lien n'est plus valable… » (variante du
+ * parcours affiché) ; le mot de passe ne change jamais sans lien.
  */
 export async function choisirMotDePasse(
   etat: EtatMotDePasse,
   formulaire: FormData,
 ): Promise<EtatMotDePasse> {
   const suivant = etat.tentative + 1;
-  const lienPlusValable: EtatMotDePasse = {
+  // Le parcours affiché (invitation ou réinitialisation) ne sert qu'à
+  // choisir le message ; les droits sont lus dans la session et en base.
+  const parcours = lireParcours(formulaire.get("parcours"));
+  const lienPlusValable = (type: TypeLien): EtatMotDePasse => ({
     erreurs: {},
-    erreurGenerale: { type: "lien", message: messageErreur("LIEN_INVALIDE") },
+    erreurGenerale: { type: "lien", message: messageLienInvalide(type) },
     tentative: suivant,
-  };
+  });
+  const lienAffiche = lienPlusValable(parcours === "reinitialisation" ? "recovery" : "invite");
   const serveur: EtatMotDePasse = {
     erreurs: {},
     erreurGenerale: { type: "serveur", message: messageErreur("ERREUR_INATTENDUE") },
@@ -356,13 +405,15 @@ export async function choisirMotDePasse(
     return serveur;
   }
 
+  let claims: unknown;
   try {
     const { data, error } = await client.auth.getClaims();
     if (error) {
       if (estPanneAuth(error)) return serveur;
-      return lienPlusValable;
+      return lienAffiche;
     }
-    if (!data?.claims) return lienPlusValable;
+    if (!data?.claims) return lienAffiche;
+    claims = data.claims;
   } catch {
     console.error("[choisirMotDePasse] exception pendant getClaims");
     return serveur;
@@ -370,17 +421,21 @@ export async function choisirMotDePasse(
 
   const invitation = await invitationDuClient(client);
   if (invitation === undefined) return serveur;
+
   if (invitation === null) {
-    // Déjà activé (second envoi, ou retour arrière) : l'espace équipe.
+    // Pas (ou plus) invité : réinitialisation, réservée à un membre actif
+    // dont la session vient d'un lien.
+    // Message selon le parcours affiché : invitation, « … Contactez votre
+    // administrateur. » ; réinitialisation, « Demander un nouveau lien ».
     const profil = await profilDuClient(client);
-    if (profil.ok && profil.donnees !== null) redirect(ACCUEIL_EQUIPE, RedirectType.replace);
-    return profil.ok ? lienPlusValable : serveur;
+    if (!profil.ok) return serveur;
+    if (profil.donnees === null || !sessionParLien(claims)) return lienAffiche;
   }
 
   try {
     const { error } = await client.auth.updateUser({ password: mot_de_passe });
-    // `same_password` : mot de passe déjà posé par un premier envoi dont
-    // l'activation a échoué ; on reprend à l'activation.
+    // `same_password` : mot de passe déjà posé (premier envoi dont
+    // l'activation a échoué, ou second envoi) ; on reprend à la suite.
     if (error && error.code !== "same_password") {
       if (error.code === "weak_password") {
         return {
@@ -390,7 +445,7 @@ export async function choisirMotDePasse(
         };
       }
       if ((error.code && CODES_SESSION_PERDUE.has(error.code)) || error.status === 401) {
-        return lienPlusValable;
+        return lienAffiche;
       }
       console.error(
         `[choisirMotDePasse] erreur Auth : code=${error.code ?? "inconnu"} statut=${error.status ?? "aucun"}`,
@@ -402,10 +457,118 @@ export async function choisirMotDePasse(
     return serveur;
   }
 
-  const activation = await appeler<unknown>(client, "activer_mon_compte");
-  if (!activation.ok) {
-    return activation.code === "DROIT_INSUFFISANT" ? lienPlusValable : serveur;
+  if (invitation !== null) {
+    const activation = await appeler<unknown>(client, "activer_mon_compte");
+    if (!activation.ok) {
+      return activation.code === "DROIT_INSUFFISANT" ? lienPlusValable("invite") : serveur;
+    }
+  } else {
+    // Réinitialisation : les autres sessions du compte sont fermées (un
+    // appareil resté connecté avec l'ancien mot de passe). Un échec est
+    // signalé sans empêcher l'arrivée sur l'espace équipe.
+    try {
+      const { error } = await client.auth.signOut({ scope: "others" });
+      if (error) {
+        signaler(
+          `[choisirMotDePasse] autres sessions non fermées : code=${error.code ?? "inconnu"} statut=${error.status ?? "aucun"}`,
+        );
+      }
+    } catch {
+      signaler("[choisirMotDePasse] autres sessions non fermées : code=exception");
+    }
   }
 
   redirect(ACCUEIL_EQUIPE, RedirectType.replace);
+}
+
+// --- Mot de passe oublié : demande d'un lien (story 4.3) ---------------------
+
+/**
+ * « Recevoir un lien » de /mot-de-passe-oublie : Zod → empreintes HMAC de
+ * l'email et de l'IP → réponse immédiate, toujours le même message. Le
+ * traitement (limite, génération du lien, email) se fait APRÈS la réponse
+ * (`after`) : le temps de réponse ne dépend jamais de l'existence du compte,
+ * et aucune erreur n'est jamais montrée (même message dans tous les cas).
+ */
+export async function demanderLienMotDePasse(
+  etat: EtatDemandeLien,
+  formulaire: FormData,
+): Promise<EtatDemandeLien> {
+  const suivant = etat.tentative + 1;
+  const verification = verifierDemandeLien(lireSaisieDemandeLien(formulaire));
+  if (!verification.ok) {
+    return { erreurs: verification.erreurs, envoyee: false, tentative: suivant };
+  }
+  const { email } = verification.donnees;
+
+  const empreintes = await empreintesDeConnexion(email, "demanderLienMotDePasse");
+  if (empreintes !== null) {
+    after(() => traiterDemandeLien(email, empreintes));
+  } else {
+    // Sans empreinte (en-tête IP ou secret HMAC absent), aucune demande ne
+    // peut aboutir : signalé, pour qu'une panne générale ne passe pas
+    // inaperçue. Le visiteur lit le même message.
+    signaler("[demanderLienMotDePasse] empreintes impossibles : demande abandonnée");
+  }
+
+  return { erreurs: {}, envoyee: true, tentative: suivant };
+}
+
+/**
+ * Traitement d'une demande, après la réponse : `demander_reinitialisation`
+ * (limite ; vrai seulement pour un membre actif) → adresse dans
+ * EMAILS_AUTORISES (sinon rien : mode démonstration, l'ancien lien du membre
+ * reste valable) → `generateLink({ type: "recovery" })` (Supabase n'envoie
+ * rien) → email par Resend. Jamais d'exception ; un échec est signalé sans
+ * email ni nom (AD-14).
+ */
+async function traiterDemandeLien(
+  email: string,
+  empreintes: { email: string; ip: string },
+): Promise<void> {
+  try {
+    const service = creerClientService();
+    const demande = await appeler<unknown>(service, "demander_reinitialisation", {
+      p_empreinte_email: empreintes.email,
+      p_empreinte_ip: empreintes.ip,
+      p_email: email,
+    });
+    if (!demande.ok) {
+      signaler(`[demanderLienMotDePasse] demande non enregistrée : code=${demande.code}`);
+      return;
+    }
+    if ((demande.donnees as { envoyer?: unknown } | null)?.envoyer !== true) return;
+
+    // Hors liste : aucun lien généré, aucun envoi (mode démonstration).
+    if (!estAdresseAutorisee(email, lireAdressesAutorisees(process.env.EMAILS_AUTORISES))) return;
+
+    const site = adresseDuSite();
+    if (site === null) {
+      signaler("[demanderLienMotDePasse] NEXT_PUBLIC_SITE_URL absente ou invalide : aucun lien");
+      return;
+    }
+
+    const { data, error } = await service.auth.admin.generateLink({ type: "recovery", email });
+    if (error) {
+      signaler(
+        `[demanderLienMotDePasse] erreur Auth : code=${error.code ?? "inconnu"} statut=${error.status ?? "aucun"}`,
+      );
+      return;
+    }
+    const jeton = data?.properties?.hashed_token;
+    if (typeof jeton !== "string" || jeton === "") {
+      signaler("[demanderLienMotDePasse] réponse inattendue de generateLink : aucun jeton");
+      return;
+    }
+
+    const envoi = await envoyerLienMotDePasse(email, {
+      lien: lienMotDePasse(site, jeton),
+      jetonHache: jeton,
+    });
+    if (envoi.etat === "echec") {
+      signaler(`[demanderLienMotDePasse] email non envoyé : code=${envoi.code ?? "inconnu"}`);
+    }
+  } catch {
+    signaler("[demanderLienMotDePasse] exception pendant le traitement de la demande");
+  }
 }
