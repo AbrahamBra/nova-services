@@ -40,9 +40,11 @@ describe("ActionsCompte — selon l'état", () => {
     expect(boutons(<ActionsCompte compte={compte("invite")} estMoi={false} />)).toEqual(["Modifier"]);
   });
 
-  it("Actif : Modifier, Désactiver", () => {
+  // Story 4.3 : « Générer un lien de mot de passe » sur un compte actif.
+  it("Actif : Modifier, Générer un lien de mot de passe, Désactiver", () => {
     expect(boutons(<ActionsCompte compte={compte("actif")} estMoi={false} />)).toEqual([
       "Modifier",
+      "Générer un lien de mot de passe",
       "Désactiver",
     ]);
   });

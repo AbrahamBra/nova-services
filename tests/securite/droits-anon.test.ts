@@ -45,6 +45,9 @@ import { Client } from "pg";
 // anon.
 // Story 3.4 : table effacements et rejouer_effacements, aucun droit (rien à
 // ajouter : service_role seulement).
+// Story 4.3 : noter_lien_mot_de_passe pour authenticated (la fonction
+// vérifie l'administrateur actif) ; demandes_reinitialisation et
+// demander_reinitialisation, aucun droit ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -71,6 +74,7 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.reactiver_membre(p_id uuid):EXECUTE",
   "authenticated:fonction:public.mon_invitation():EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
+  "authenticated:fonction:public.noter_lien_mot_de_passe(p_id uuid):EXECUTE",
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
   "authenticated:fonction:public.liberer(p_demande_id uuid):EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",

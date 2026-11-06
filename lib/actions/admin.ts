@@ -15,14 +15,19 @@ import {
   type EtatInvitation,
 } from "@/lib/schemas/invitation";
 import { appeler, type ResultatAction } from "@/lib/server/appeler";
-import { adresseDuSite, creeParCetAppel, lienInvitation } from "@/lib/server/liens";
+import {
+  adresseDuSite,
+  creeParCetAppel,
+  lienInvitation,
+  lienMotDePasse,
+} from "@/lib/server/liens";
 import { creerClientService } from "@/lib/server/supabase-service";
 import { lireProfil } from "@/lib/session";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur d'administration des comptes (epic 4, AD-1, AD-7).
 // Story 4.1 : invitation d'un nouveau membre. Story 4.2 : modifier,
-// désactiver, réactiver un compte. Le rôle d'administrateur est revérifié
+// désactiver, réactiver un compte. Story 4.3 : lien de mot de passe. Le rôle d'administrateur est revérifié
 // par chaque action (jamais seulement par l'écran), puis par la base.
 
 /** Durée du blocage Auth d'un compte désactivé (environ 100 ans). */
@@ -385,4 +390,64 @@ export async function reactiverMembre(membreId: unknown): Promise<ResultatAction
 
   revalidatePath(CHEMIN_COMPTES);
   return { ok: true, donnees: null };
+}
+
+// --- Story 4.3 : lien de mot de passe généré par l'administrateur ----------
+
+/**
+ * Génère un lien de mot de passe pour un membre actif (story 4.3, mode
+ * démonstration : le lien est affiché à l'administrateur, qui le copie).
+ * Profil administrateur revérifié (sinon ACCES_REFUSE) → adresse du site →
+ * `noter_lien_mot_de_passe` avec la SESSION de l'administrateur (membre
+ * actif seulement, sinon ETAT_COMPTE_INVALIDE ; journal
+ * `lien_mot_de_passe_genere` ; renvoie l'email) → `generateLink({ type:
+ * "recovery" })` (aucun email envoyé par Supabase ; le lien précédent du
+ * membre devient invalide).
+ */
+export async function genererLienMotDePasse(
+  membreId: unknown,
+): Promise<ResultatAction<{ nom: string; lien: string }>> {
+  const admin = await verifierAdmin();
+  if (!admin.ok) return refus(admin.code);
+
+  const identifiant = schemaIdCompte.safeParse(membreId);
+  if (!identifiant.success) return refus("DONNEES_INVALIDES");
+  const id = identifiant.data;
+
+  const site = adresseDuSite();
+  if (site === null) {
+    console.error("[genererLienMotDePasse] NEXT_PUBLIC_SITE_URL absente ou invalide : aucun lien");
+    return refus("ADRESSE_SITE_MANQUANTE");
+  }
+
+  const client = await clientSession("genererLienMotDePasse");
+  if (!client) return refus("ERREUR_INATTENDUE");
+
+  const note = await appeler<unknown>(client, "noter_lien_mot_de_passe", { p_id: id });
+  if (!note.ok) return refusBase(note.code);
+  const { nom, email } = (note.donnees ?? {}) as { nom?: unknown; email?: unknown };
+  if (typeof nom !== "string" || typeof email !== "string" || email === "") {
+    signaler("[genererLienMotDePasse] réponse inattendue de noter_lien_mot_de_passe");
+    return refus("ERREUR_INATTENDUE");
+  }
+
+  try {
+    const service = creerClientService();
+    const { data, error } = await service.auth.admin.generateLink({ type: "recovery", email });
+    if (error) {
+      signaler(
+        `[genererLienMotDePasse] erreur Auth : id=${id} code=${error.code ?? "inconnu"} statut=${error.status ?? "aucun"}`,
+      );
+      return refus("ERREUR_INATTENDUE");
+    }
+    const jeton = data?.properties?.hashed_token;
+    if (typeof jeton !== "string" || jeton === "") {
+      signaler(`[genererLienMotDePasse] réponse inattendue de generateLink : id=${id} aucun jeton`);
+      return refus("ERREUR_INATTENDUE");
+    }
+    return { ok: true, donnees: { nom, lien: lienMotDePasse(site, jeton) } };
+  } catch {
+    signaler(`[genererLienMotDePasse] exception pendant generateLink : id=${id}`);
+    return refus("ERREUR_INATTENDUE");
+  }
 }

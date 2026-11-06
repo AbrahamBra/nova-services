@@ -422,6 +422,8 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
       "commencer_connexion",
       // Story 1.4 : création des membres (scripts, puis invitations).
       "creer_membre",
+      // Story 4.3 : demande d'un lien « Mot de passe oublié ».
+      "demander_reinitialisation",
       "deposer_demande",
       "infos_publiques",
       "lire_confirmation",

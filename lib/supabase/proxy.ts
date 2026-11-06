@@ -46,6 +46,60 @@ export function heureDeConnexion(claims: unknown): number | null {
   return heure;
 }
 
+/** Méthodes `amr` d'une connexion par lien (invitation, réinitialisation). */
+export const METHODES_LIEN = ["otp", "recovery", "invite", "magiclink"] as const;
+
+/** Durée pendant laquelle une session ouverte par un lien peut changer le mot de passe. */
+export const DUREE_LIEN_MOT_DE_PASSE_MS = 60 * 60 * 1000;
+
+/**
+ * Connexion la plus récente parmi le mot de passe et les liens (claim
+ * `amr`) : méthode et heure (ms). Toute autre méthode (totp, oauth, sso…)
+ * est ignorée ; à horodatage égal, `password` l'emporte. null si
+ * introuvable.
+ */
+export function derniereConnexion(claims: unknown): { methode: string; heure: number } | null {
+  if (typeof claims !== "object" || claims === null) return null;
+  const amr = (claims as { amr?: unknown }).amr;
+  if (!Array.isArray(amr)) return null;
+  let plusRecente: { methode: string; heure: number } | null = null;
+  for (const entree of amr) {
+    if (typeof entree !== "object" || entree === null) continue;
+    const { method, timestamp } = entree as { method?: unknown; timestamp?: unknown };
+    if (
+      typeof method !== "string" ||
+      (method !== "password" && !(METHODES_LIEN as readonly string[]).includes(method))
+    ) {
+      continue;
+    }
+    if (typeof timestamp !== "number" || !Number.isFinite(timestamp) || timestamp <= 0) continue;
+    const heure = timestamp * 1000;
+    if (
+      plusRecente === null ||
+      heure > plusRecente.heure ||
+      (heure === plusRecente.heure && method === "password")
+    ) {
+      plusRecente = { methode: method, heure };
+    }
+  }
+  return plusRecente;
+}
+
+/**
+ * Story 4.3 : vrai si la session vient d'un lien (connexion la plus récente
+ * par `otp`, `recovery`, `invite` ou `magiclink`, pas par mot de passe) ouvert
+ * il y a moins d'une heure. Seule une telle session peut changer le mot de
+ * passe ; au-delà, « Ce lien n'est plus valable. ».
+ */
+export function sessionParLien(claims: unknown, maintenant: number = Date.now()): boolean {
+  const derniere = derniereConnexion(claims);
+  return (
+    derniere !== null &&
+    derniere.methode !== "password" &&
+    maintenant - derniere.heure < DUREE_LIEN_MOT_DE_PASSE_MS
+  );
+}
+
 /** Vrai si la session doit être fermée : plus de 8 h, ou heure introuvable. */
 export function sessionExpiree(claims: unknown, maintenant: number = Date.now()): boolean {
   const heure = heureDeConnexion(claims);

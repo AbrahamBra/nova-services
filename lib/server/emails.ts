@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { Resend } from "resend";
 import type { EtatEmailResultat } from "@/lib/domaine";
 import { formaterDateHeure } from "@/lib/format";
@@ -243,6 +244,98 @@ export async function envoyerConfirmation(
       de: enteteExpediteur(donnees.nomAffiche, adresseExpediteur),
       ...contenu,
       cleIdempotence: `confirmation-demande/${donnees.demandeId}`,
+    });
+    return resultat.ok
+      ? { etat: "envoye", code: null }
+      : { etat: "echec", code: codeSur(resultat.code) };
+  } catch {
+    return { etat: "echec", code: "exception" };
+  }
+}
+
+// --- Lien de mot de passe (story 4.3) ---------------------------------------
+
+/** Nom affiché de l'expéditeur des emails de mot de passe. */
+export const NOM_EXPEDITEUR_EQUIPE = "Nova Services";
+
+/**
+ * Contenu de l'email « Choisissez un nouveau mot de passe ». Ne cite ni le
+ * nom du membre ni son adresse : seulement le lien et sa durée.
+ */
+export function contenuLienMotDePasse(lien: string): ContenuEmail {
+  const objet = "Choisissez un nouveau mot de passe";
+  const texte = [
+    "Bonjour,",
+    "",
+    "Une demande de nouveau mot de passe a été faite pour votre compte de l'espace équipe Nova Services.",
+    "",
+    "Pour choisir un nouveau mot de passe, ouvrez ce lien :",
+    lien,
+    "",
+    "Ce lien est valable 24 h et ne sert qu'une fois.",
+    "",
+    "Si vous n'avez rien demandé, ignorez cet email : votre mot de passe actuel reste valable.",
+    "",
+  ].join("\n");
+
+  const e = { lien: echapperHtml(lien), nom: echapperHtml(NOM_EXPEDITEUR_EQUIPE) };
+
+  const html = `<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>${e.nom}</title></head>
+<body style="margin:0;padding:24px;background:#F8FAFC;font-family:Inter,Arial,sans-serif;color:#0F172A;">
+<div style="max-width:560px;margin:0 auto;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:24px;">
+<p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1E3A8A;">${e.nom}</p>
+<p style="margin:0 0 8px;">Bonjour,</p>
+<p style="margin:0 0 16px;">Une demande de nouveau mot de passe a été faite pour votre compte de l'espace équipe Nova Services.</p>
+<p style="margin:0 0 16px;"><a href="${e.lien}" style="display:inline-block;background:#1E3A8A;color:#FFFFFF;text-decoration:none;font-weight:600;padding:10px 16px;border-radius:6px;">Choisir un nouveau mot de passe</a></p>
+<p style="margin:0 0 16px;font-size:13px;color:#64748B;">Ou copiez ce lien dans votre navigateur :<br><span style="word-break:break-all;">${e.lien}</span></p>
+<p style="margin:0 0 16px;">Ce lien est valable 24 h et ne sert qu'une fois.</p>
+<p style="margin:0;font-size:13px;color:#64748B;">Si vous n'avez rien demandé, ignorez cet email : votre mot de passe actuel reste valable.</p>
+</div>
+</body>
+</html>
+`;
+
+  return { objet, texte, html };
+}
+
+/**
+ * Clé d'idempotence d'un email de mot de passe : empreinte SHA-256 du jeton
+ * haché (le jeton lui-même n'est jamais transmis hors du lien).
+ */
+export function cleIdempotenceMotDePasse(jetonHache: string): string {
+  return `mot-de-passe/${createHash("sha256").update(jetonHache, "utf8").digest("hex")}`;
+}
+
+/**
+ * Envoie l'email « Choisissez un nouveau mot de passe » (story 4.3) et
+ * renvoie l'état. Adresse hors de EMAILS_AUTORISES : aucun appel,
+ * `non_envoye_demo`. Ne lève jamais d'exception.
+ */
+export async function envoyerLienMotDePasse(
+  destinataire: string,
+  donnees: { lien: string; jetonHache: string },
+  options: OptionsEnvoi = {},
+): Promise<ResultatEnvoi> {
+  try {
+    const autorisees = lireAdressesAutorisees(
+      options.adressesAutorisees ?? process.env.EMAILS_AUTORISES,
+    );
+    if (!estAdresseAutorisee(destinataire, autorisees)) {
+      return { etat: "non_envoye_demo", code: null };
+    }
+
+    const contenu = contenuLienMotDePasse(donnees.lien);
+    const expediteur = options.expediteur ?? expediteurResend();
+    const adresseExpediteur =
+      (options.adresseExpediteur ?? process.env.EMAIL_EXPEDITEUR ?? "").trim() ||
+      ADRESSE_EXPEDITEUR;
+    const resultat = await expediteur({
+      a: destinataire.trim(),
+      de: enteteExpediteur(NOM_EXPEDITEUR_EQUIPE, adresseExpediteur),
+      ...contenu,
+      cleIdempotence: cleIdempotenceMotDePasse(donnees.jetonHache),
     });
     return resultat.ok
       ? { etat: "envoye", code: null }

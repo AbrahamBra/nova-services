@@ -1,4 +1,5 @@
 import "server-only";
+import type { TypeLien } from "@/lib/schemas/mot-de-passe";
 
 // Liens envoyés aux membres (epic 4) : fabriqués par l'application à partir
 // du jeton haché de `generateLink` et de NEXT_PUBLIC_SITE_URL. Jamais à
@@ -25,10 +26,23 @@ export function adresseDuSite(valeur: string | undefined = process.env.NEXT_PUBL
   return url.origin;
 }
 
-/** Lien d'invitation : page /auth/confirmer, qui ne consomme le jeton qu'au clic. */
-export function lienInvitation(site: string, jetonHache: string): string {
-  const parametres = new URLSearchParams({ token_hash: jetonHache, type: "invite" });
+/**
+ * Lien vers /auth/confirmer (invitation ou réinitialisation du mot de passe),
+ * page qui ne consomme le jeton qu'au clic sur « Continuer ».
+ */
+export function lienConfirmation(site: string, jetonHache: string, type: TypeLien): string {
+  const parametres = new URLSearchParams({ token_hash: jetonHache, type });
   return `${site}/auth/confirmer?${parametres.toString()}`;
+}
+
+/** Lien d'invitation (story 4.1). */
+export function lienInvitation(site: string, jetonHache: string): string {
+  return lienConfirmation(site, jetonHache, "invite");
+}
+
+/** Lien de réinitialisation du mot de passe (story 4.3). */
+export function lienMotDePasse(site: string, jetonHache: string): string {
+  return lienConfirmation(site, jetonHache, "recovery");
 }
 
 /** Marge pour l'écart d'horloge entre ce serveur et Supabase Auth. */

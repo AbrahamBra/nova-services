@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from "react";
 import { CLASSE_CHAMP, CLASSE_LIBELLE, MessageErreur } from "@/components/formulaire-depot";
 import { Bouton } from "@/components/nova/bouton";
+import { ContenuLien } from "@/components/nova/comptes/fenetre-lien";
 import { useToasts } from "@/components/nova/toasts";
 import {
   AlertDialog,
@@ -27,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   desactiverMembre,
+  genererLienMotDePasse,
   modifierMembre,
   reactiverMembre,
   type ResultatModification,
@@ -45,10 +47,11 @@ import { OPTIONS_ROLE } from "@/lib/schemas/invitation";
 
 // Actions d'un compte (EXPERIENCE.md §9.7, story 4.2), selon son état :
 //   - Invité : Modifier ;
-//   - Actif : Modifier, Désactiver ;
+//   - Actif : Modifier, Générer un lien de mot de passe (story 4.3), Désactiver ;
 //   - Désactivé : Modifier, Réactiver.
 // Sur la ligne de l'administrateur connecté : « Modifier » sans champ Rôle,
-// jamais « Désactiver » (la base refuse de toute façon : PROPRE_COMPTE).
+// jamais « Désactiver » (la base refuse de toute façon : PROPRE_COMPTE) ni
+// « Générer un lien de mot de passe ».
 // Chaque action donne un toast ; la liste est rafraîchie par l'action
 // serveur (revalidatePath).
 
@@ -89,6 +92,7 @@ export function ActionsCompte({ compte, estMoi }: { compte: Compte; estMoi: bool
       className="flex flex-wrap gap-2"
     >
       <FenetreModifier compte={compte} estMoi={estMoi} />
+      {compte.etat === "actif" && !estMoi ? <BoutonLienMotDePasse compte={compte} /> : null}
       {compte.etat === "actif" && !estMoi ? (
         <FenetreDesactiver
           compte={compte}
@@ -503,5 +507,76 @@ function BoutonReactiver({
       {envoi ? "Réactivation…" : "Réactiver"}
       <NomCache nom={compte.nom} />
     </Button>
+  );
+}
+
+// --- Lien de mot de passe (story 4.3) ---------------------------------------------
+
+/**
+ * « Générer un lien de mot de passe » : sans confirmation (le mot de passe
+ * actuel reste valable tant que le lien n'est pas utilisé), puis la fenêtre
+ * du lien (mode démonstration) avec « Copier ». Refus : toast d'erreur.
+ */
+function BoutonLienMotDePasse({ compte }: { compte: Compte }) {
+  const [envoi, demarrer] = useTransition();
+  const enVol = useRef(false);
+  const boutonRef = useRef<HTMLButtonElement>(null);
+  const [lien, setLien] = useState<{ nom: string; lien: string } | null>(null);
+  const { afficher } = useToasts();
+
+  function generer() {
+    if (enVol.current) return;
+    enVol.current = true;
+    demarrer(async () => {
+      let resultat: Awaited<ReturnType<typeof genererLienMotDePasse>>;
+      try {
+        resultat = await genererLienMotDePasse(compte.id);
+      } catch {
+        resultat = echecInattendu();
+      } finally {
+        enVol.current = false;
+      }
+      if (resultat.ok) setLien(resultat.donnees);
+      else afficher("erreur", resultat.message);
+    });
+  }
+
+  return (
+    <>
+      <Button
+        ref={boutonRef}
+        type="button"
+        variant="outline"
+        disabled={envoi}
+        onClick={generer}
+        className={CLASSE_ACTION}
+      >
+        {envoi ? "Génération…" : "Générer un lien de mot de passe"}
+        <NomCache nom={compte.nom} />
+      </Button>
+      <Dialog
+        open={lien !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) setLien(null);
+        }}
+      >
+        <DialogContent
+          onCloseAutoFocus={(evenement) => {
+            // Le focus revient au bouton de la ligne.
+            evenement.preventDefault();
+            boutonRef.current?.focus();
+          }}
+        >
+          {lien ? (
+            <ContenuLien
+              titre="Lien de mot de passe"
+              description={`Aucun email n'est envoyé : copiez ce lien et transmettez-le à ${lien.nom}. Son mot de passe actuel reste valable tant que le lien n'est pas utilisé.`}
+              libelle="Lien de mot de passe"
+              lien={lien.lien}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

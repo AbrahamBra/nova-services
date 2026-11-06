@@ -12,6 +12,7 @@ import {
 import { unstable_rethrow } from "next/navigation";
 import { CLASSE_CHAMP, CLASSE_LIBELLE, MessageErreur } from "@/components/formulaire-depot";
 import { Bouton } from "@/components/nova/bouton";
+import { DemanderNouveauLien } from "@/components/lien-plus-valable";
 import { BoutonReessayer } from "@/components/nova/reessayer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,14 +27,22 @@ import {
   type ChampMotDePasse,
   type ErreursMotDePasse,
   type EtatMotDePasse,
+  type ParcoursMotDePasse,
 } from "@/lib/schemas/mot-de-passe";
 
 // Formulaire « Choisir un mot de passe » (EXPERIENCE.md §9.12, story 4.1) :
 // deux champs (mot de passe, confirmation) et la règle « 8 caractères
 // minimum » affichée. Vérifié à l'écran avec le schéma Zod partagé, puis par
 // l'action `choisirMotDePasse` et par Supabase. Réussite : l'espace équipe.
+// Story 4.3 : même formulaire pour un nouveau mot de passe après un lien de
+// réinitialisation (`parcours`, qui ne choisit que le message d'un lien plus
+// valable et le bouton « Demander un nouveau lien »).
 
-async function envoyerAuServeur(etat: EtatMotDePasse, donnees: FormData): Promise<EtatMotDePasse> {
+/** Envoi du formulaire à l'action (exporté pour les tests). */
+export async function envoyerAuServeur(
+  etat: EtatMotDePasse,
+  donnees: FormData,
+): Promise<EtatMotDePasse> {
   try {
     return (await choisirMotDePasse(etat, donnees)) ?? etat;
   } catch (erreur) {
@@ -47,7 +56,7 @@ async function envoyerAuServeur(etat: EtatMotDePasse, donnees: FormData): Promis
   }
 }
 
-export function FormulaireMotDePasse() {
+export function FormulaireMotDePasse({ parcours }: { parcours: ParcoursMotDePasse }) {
   const id = useId();
   const formulaireRef = useRef<HTMLFormElement>(null);
   const bandeauRef = useRef<HTMLDivElement>(null);
@@ -122,6 +131,8 @@ export function FormulaireMotDePasse() {
         }
       }}
     >
+      <input type="hidden" name="parcours" value={parcours} />
+
       {erreurGenerale ? (
         <div
           ref={bandeauRef}
@@ -175,9 +186,35 @@ export function FormulaireMotDePasse() {
         <MessageErreur id={idErreur("confirmation")} message={erreurs.confirmation} />
       </div>
 
-      <Bouton type="submit" disabled={enCours || lienPlusValable} className="mt-2 w-full">
-        {enCours ? "Envoi en cours…" : "Enregistrer mon mot de passe"}
-      </Bouton>
+      <PiedFormulaireMotDePasse
+        parcours={parcours}
+        lienPlusValable={lienPlusValable}
+        enCours={enCours}
+      />
     </form>
+  );
+}
+
+/**
+ * Bas du formulaire : « Enregistrer mon mot de passe », désactivé quand le
+ * lien n'est plus valable ; en réinitialisation, remplacé alors par
+ * « Demander un nouveau lien » (l'invitation garde le bouton désactivé).
+ */
+export function PiedFormulaireMotDePasse({
+  parcours,
+  lienPlusValable,
+  enCours,
+}: {
+  parcours: ParcoursMotDePasse;
+  lienPlusValable: boolean;
+  enCours: boolean;
+}) {
+  if (lienPlusValable && parcours === "reinitialisation") {
+    return <DemanderNouveauLien className="mt-2 w-full" />;
+  }
+  return (
+    <Bouton type="submit" disabled={enCours || lienPlusValable} className="mt-2 w-full">
+      {enCours ? "Envoi en cours…" : "Enregistrer mon mot de passe"}
+    </Bouton>
   );
 }

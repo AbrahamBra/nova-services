@@ -9,6 +9,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { Bouton } from "@/components/nova/bouton";
 import { BoutonReessayer } from "@/components/nova/reessayer";
@@ -25,10 +26,12 @@ import {
   type ErreursConnexion,
   type EtatConnexion,
 } from "@/lib/schemas/connexion";
+import { PAGE_MOT_DE_PASSE_OUBLIE } from "@/lib/schemas/mot-de-passe";
 
 // Formulaire « Connexion » (EXPERIENCE.md §9.12, §5) : email et mot de passe,
 // vérifiés à l'écran avec le schéma Zod partagé puis par l'action serveur
 // `connexion`. En cas d'échec, l'email est conservé et le mot de passe vidé.
+// Story 4.3 : lien « Mot de passe oublié » sous le champ Mot de passe.
 
 const CLASSE_CHAMP = "h-11 rounded-md bg-surface px-3 text-[15px] md:text-[15px]";
 const CLASSE_LIBELLE = "text-sm font-medium leading-[1.4]";
@@ -208,6 +211,14 @@ export function FormulaireConnexion({
           />
         </div>
         <MessageErreur id={idErreur("mot_de_passe")} message={erreurs.mot_de_passe} />
+        <p className="mt-2 text-sm">
+          <Link
+            href={PAGE_MOT_DE_PASSE_OUBLIE}
+            className="rounded-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Mot de passe oublié
+          </Link>
+        </p>
       </div>
 
       <Bouton type="submit" disabled={enCours} className="mt-2 w-full">

@@ -316,7 +316,7 @@ describe("confirmerLien", () => {
 
   it.each([
     { token_hash: "court", type: "invite" },
-    { token_hash: JETON, type: "recovery" },
+    { token_hash: JETON, type: "magiclink" },
     { token_hash: `${JETON}<script>`, type: "invite" },
   ])("lien mal formé %j : refusé sans appel à Auth", async (valeurs) => {
     const etat = await confirmerLien(ETAT_CONFIRMATION_INITIAL, formulaire(valeurs));
@@ -394,7 +394,13 @@ describe("choisirMotDePasse", () => {
     expect(sim.rpcSession).toHaveBeenCalledWith("activer_mon_compte", undefined);
   });
 
-  it("déjà activé (mon_invitation null, profil actif) : /equipe sans toucher au mot de passe", async () => {
+  // Story 4.3 : la branche « déjà actif » met vraiment à jour le mot de
+  // passe, mais seulement pour une session venue d'un lien.
+  it("déjà activé, session venue du lien : mot de passe mis à jour, sans activation, puis /equipe", async () => {
+    sim.getClaims.mockResolvedValue({
+      data: { claims: { sub: NOUVEL_ID, amr: [{ method: "otp", timestamp: Math.floor(Date.now() / 1000) - 60 }] } },
+      error: null,
+    });
     sim.rpcSession.mockImplementation(async (fonction: string) => {
       if (fonction === "mon_profil") {
         return { data: { nom: "Léo Martin", role: "collaborateur", etat: "actif" }, error: null };
@@ -404,6 +410,19 @@ describe("choisirMotDePasse", () => {
     await expect(choisirMotDePasse(ETAT_MOT_DE_PASSE_INITIAL, formulaire(BON))).rejects.toThrow(
       "NEXT_REDIRECT:/equipe",
     );
+    expect(sim.updateUser).toHaveBeenCalledWith({ password: BON.mot_de_passe });
+    expect(sim.rpcSession).not.toHaveBeenCalledWith("activer_mon_compte", undefined);
+  });
+
+  it("déjà activé, session ouverte par mot de passe : lien plus valable, rien changé", async () => {
+    sim.rpcSession.mockImplementation(async (fonction: string) => {
+      if (fonction === "mon_profil") {
+        return { data: { nom: "Léo Martin", role: "collaborateur", etat: "actif" }, error: null };
+      }
+      return { data: null, error: null };
+    });
+    const etat = await choisirMotDePasse(ETAT_MOT_DE_PASSE_INITIAL, formulaire(BON));
+    expect(etat.erreurGenerale?.type).toBe("lien");
     expect(sim.updateUser).not.toHaveBeenCalled();
   });
 

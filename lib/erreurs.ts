@@ -58,6 +58,11 @@ export const MESSAGES_ERREUR = {
   PROPRE_COMPTE: "Vous ne pouvez ni désactiver votre propre compte ni changer votre propre rôle.",
   ETAT_COMPTE_INVALIDE: "Cette action n'est pas possible pour l'état actuel de ce compte.",
   COMPTE_DESACTIVE: "Cette adresse appartient à un compte désactivé.",
+  // Story 4.3 — lien de réinitialisation invalide, expiré, déjà utilisé ou
+  // remplacé, ou page du nouveau mot de passe ouverte sans session venue
+  // d'un lien (propre à l'application). L'écran propose « Demander un
+  // nouveau lien ».
+  LIEN_REINITIALISATION_INVALIDE: "Ce lien n'est plus valable.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
@@ -70,6 +75,7 @@ export const CODES_APPLICATION: readonly CodeErreur[] = [
   "ACCES_REFUSE",
   "LIEN_INVALIDE",
   "ADRESSE_SITE_MANQUANTE",
+  "LIEN_REINITIALISATION_INVALIDE",
 ];
 
 export const CODES_ERREUR = Object.keys(MESSAGES_ERREUR) as CodeErreur[];

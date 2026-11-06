@@ -127,3 +127,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
   summary: Épingler `supabase/setup-cli` par empreinte de commit dans les tâches qui voient `SAUVEGARDE_PHRASE`.
   evidence: Même report que pour la story 3.2.
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-3-mot-de-passe-oublie.md`
+  summary: Le toast d'erreur de « Générer un lien de mot de passe » (compte désactivé entre-temps, panne) n'est vérifié par aucun test.
+  evidence: `BoutonLienMotDePasse` (components/nova/comptes/actions-compte.tsx) ; seuls les codes de refus de l'action sont testés ; à couvrir si un test de toasts est écrit pour ce fichier.
