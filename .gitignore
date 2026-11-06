@@ -51,3 +51,6 @@ next-env.d.ts
 
 # réglages personnels de Claude Code
 .claude/settings.local.json
+
+# Dossier local de Netlify (construction, CLI)
+.netlify/
