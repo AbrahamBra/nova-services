@@ -100,6 +100,27 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows.map((ligne) => ligne.fonction)).toEqual([]);
   });
 
+  // Story 4.1 : la liste des comptes, l'invitation et l'activation se lisent
+  // avec la session du membre (auth.uid()), jamais avec la clé secrète ;
+  // creer_membre (nouvelle signature, avec l'auteur) reste à service_role.
+  it("aucun droit sur lister_comptes, mon_invitation ni activer_mon_compte ; creer_membre et verifier_email_libre permises", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.lister_comptes()', 'public.mon_invitation()',
+                         'public.activer_mon_compte()',
+                         'public.creer_membre(uuid, text, text, text, text, uuid)',
+                         'public.verifier_email_libre(text)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.activer_mon_compte()": false,
+      "public.creer_membre(uuid, text, text, text, text, uuid)": true,
+      "public.lister_comptes()": false,
+      "public.mon_invitation()": false,
+      "public.verifier_email_libre(text)": true,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

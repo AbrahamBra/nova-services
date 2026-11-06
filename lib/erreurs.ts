@@ -45,6 +45,13 @@ export const MESSAGES_ERREUR = {
   MEMBRE_INVALIDE: "Ce membre n'est pas actif.",
   // Story 3.3 — action réservée à l'administrateur (AD-1), refusée côté application.
   ACCES_REFUSE: "Vous n'avez pas accès à cette page.",
+  // Story 4.1 — lien d'invitation invalide, expiré ou déjà utilisé, ou page
+  // du mot de passe ouverte sans session d'invitation (propre à l'application).
+  LIEN_INVALIDE: "Ce lien n'est plus valable. Contactez votre administrateur.",
+  // Story 4.1 — NEXT_PUBLIC_SITE_URL absente ou invalide : aucune invitation
+  // n'est créée, jamais un lien faux (propre à l'application).
+  ADRESSE_SITE_MANQUANTE:
+    "L'adresse du site n'est pas configurée (NEXT_PUBLIC_SITE_URL) : aucune invitation n'a été créée.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;
@@ -55,6 +62,8 @@ export const CODES_APPLICATION: readonly CodeErreur[] = [
   "CONNEXION_REFUSEE",
   "ENVOI_IMPOSSIBLE",
   "ACCES_REFUSE",
+  "LIEN_INVALIDE",
+  "ADRESSE_SITE_MANQUANTE",
 ];
 
 export const CODES_ERREUR = Object.keys(MESSAGES_ERREUR) as CodeErreur[];

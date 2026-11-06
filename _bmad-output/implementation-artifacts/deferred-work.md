@@ -103,3 +103,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-8-tableau-de-bord.md`
   summary: « Copier le lien » (tableau de bord vide) n'a aucun test au clic : adresse copiée (`origin + "/"`) et libellés « Lien copié » / « Copie impossible ».
   evidence: l'état vide est inatteignable sur la base partagée des tests navigateur, et vitest tourne en environnement `node` (pas de banc de composants).
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-1-inviter-un-membre.md`
+  summary: Deux invitations simultanées de la même adresse (ou une horloge serveur en avance de plus de 2 min) peuvent remplacer le jeton du premier lien, voire supprimer un compte Auth créé par l'autre appel.
+  evidence: non vérifié (medium s'il est réel) ; à trancher par un test qui lance deux `inviter` en parallèle sur la même adresse, et corriger par un verrou par adresse (advisory lock) avant `generateLink`.

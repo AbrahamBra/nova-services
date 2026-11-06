@@ -54,15 +54,14 @@ test.describe("page de test du suivi des erreurs", () => {
     await expect(page.getByRole("button", { name: "Provoquer une erreur de test" })).toHaveCount(0);
   });
 
-  test("un administrateur y accède depuis l'administration et voit l'écran de confirmation", async ({
+  // Story 4.1 : la page provisoire de l'administration a disparu ; la page
+  // de test reste accessible par son adresse.
+  test("un administrateur y accède par son adresse et voit l'écran de confirmation", async ({
     page,
   }) => {
     const admin = await compte({ role: "administrateur" });
-    await seConnecter(page, admin, "/equipe/admin");
-    await expect(page).toHaveURL(/\/equipe\/admin$/, APRES_CONNEXION);
-
-    await page.getByRole("link", { name: "Page de test du suivi des erreurs" }).click();
-    await expect(page).toHaveURL(/\/equipe\/admin\/test-erreur$/);
+    await seConnecter(page, admin, "/equipe/admin/test-erreur");
+    await expect(page).toHaveURL(/\/equipe\/admin\/test-erreur$/, APRES_CONNEXION);
     await expect(page.getByRole("heading", { level: 1, name: "Test du suivi des erreurs" })).toBeVisible();
     await expect(page).toHaveTitle("Test du suivi des erreurs — Nova Services");
     await sansViolationAxe(page);

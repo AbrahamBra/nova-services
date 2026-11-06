@@ -106,14 +106,15 @@ test.describe("connexion à l'espace équipe", () => {
     await expect(menu(page).getByRole("heading", { name: "Administration" })).toBeVisible();
     await expect(menu(page).getByText(admin.nom, { exact: true })).toBeVisible();
     await expect(menu(page).getByText("Administrateur", { exact: true })).toBeVisible();
-    // Story 1.5 : Accueil, Demandes et Vue d'ensemble ; story 2.6 : Saisir une demande.
+    // Story 1.5 : Accueil, Demandes et Administration ; story 2.6 : Saisir une
+    // demande ; story 4.1 : « Comptes » remplace « Vue d'ensemble ».
     await expect(menu(page).getByRole("link")).toHaveCount(4);
     await sansViolationAxe(page);
 
     // Zone administrateur ouverte à l'administrateur.
-    await menu(page).getByRole("link", { name: "Vue d'ensemble" }).click();
-    await expect(page).toHaveURL(/\/equipe\/admin$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Administration" })).toBeVisible();
+    await menu(page).getByRole("link", { name: "Comptes" }).click();
+    await expect(page).toHaveURL(/\/equipe\/admin\/comptes$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Comptes" })).toBeVisible();
 
     // Déconnexion, puis une page interne renvoie vers la connexion.
     await seDeconnecter(page);
@@ -245,14 +246,15 @@ test.describe("connexion à l'espace équipe", () => {
     const admin = await compte({ role: "administrateur" });
     await page.goto("/connexion?retour=%2Fequipe%2Fadmin");
     await seConnecter(page, admin.email, admin.motDePasse);
-    await expect(page).toHaveURL(/\/equipe\/admin$/, APRES_CONNEXION);
-    await expect(page.getByRole("heading", { level: 1, name: "Administration" })).toBeVisible();
+    // Story 4.1 : /equipe/admin mène à « Comptes ».
+    await expect(page).toHaveURL(/\/equipe\/admin\/comptes$/, APRES_CONNEXION);
+    await expect(page.getByRole("heading", { level: 1, name: "Comptes" })).toBeVisible();
 
     // Déjà connecté : la page de connexion mène à l'espace équipe.
     await page.goto("/connexion");
     await expect(page).toHaveURL(/\/equipe$/);
     await page.goto("/connexion?retour=%2Fequipe%2Fadmin");
-    await expect(page).toHaveURL(/\/equipe\/admin$/);
+    await expect(page).toHaveURL(/\/equipe\/admin\/comptes$/);
   });
 
   test("les droits sont relus à chaque page : rétrogradé, l'administrateur perd l'administration ; désactivé, il revient à la connexion", async ({

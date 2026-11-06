@@ -28,7 +28,8 @@ const RUBRIQUES: Rubrique[] = [
   // Story 2.6 : saisie interne.
   { libelle: "Saisir une demande", adresse: "/equipe/demandes/nouvelle" },
 ];
-const RUBRIQUES_ADMIN: Rubrique[] = [{ libelle: "Vue d'ensemble", adresse: "/equipe/admin" }];
+// Story 4.1 : « Comptes » remplace la page provisoire « Vue d'ensemble ».
+const RUBRIQUES_ADMIN: Rubrique[] = [{ libelle: "Comptes", adresse: "/equipe/admin/comptes" }];
 
 type Props = {
   nom: string;

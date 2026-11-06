@@ -9,7 +9,9 @@ export async function proxy(requete: NextRequest) {
 
 export const config = {
   // Seules les pages qui utilisent la session : l'espace équipe (y compris
-  // `/equipe`) et la connexion. Les pages publiques (formulaire,
-  // confirmation) ne lisent jamais la session.
-  matcher: ["/equipe/:path*", "/connexion"],
+  // `/equipe`), la connexion et, story 4.1, le lien d'invitation
+  // (`/auth/confirmer`, qui pose la session de l'invité) et le choix du mot de
+  // passe. Les pages publiques (formulaire, confirmation) ne lisent jamais la
+  // session.
+  matcher: ["/equipe/:path*", "/connexion", "/auth/confirmer", "/nouveau-mot-de-passe"],
 };
