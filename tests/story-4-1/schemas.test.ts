@@ -113,11 +113,12 @@ describe("adresse du site et lien d'invitation", () => {
 });
 
 describe("lecture de lister_comptes", () => {
+  // Story 4.2 : chaque compte porte aussi `demandes_en_cours`.
   it("triée par nom à la française, accents et majuscules ignorés", () => {
     const comptes = lireReponseComptes([
-      { id: "3", nom: "zoé Bernard", email: "z@x.fr", role: "collaborateur", etat: "actif" },
-      { id: "1", nom: "Élodie Petit", email: "e@x.fr", role: "administrateur", etat: "actif" },
-      { id: "2", nom: "Léo Martin", email: "l@x.fr", role: "collaborateur", etat: "invite" },
+      { id: "3", nom: "zoé Bernard", email: "z@x.fr", role: "collaborateur", etat: "actif", demandes_en_cours: 0 },
+      { id: "1", nom: "Élodie Petit", email: "e@x.fr", role: "administrateur", etat: "actif", demandes_en_cours: 0 },
+      { id: "2", nom: "Léo Martin", email: "l@x.fr", role: "collaborateur", etat: "invite", demandes_en_cours: 0 },
     ]);
     expect(comptes?.map((c) => c.nom)).toEqual(["Élodie Petit", "Léo Martin", "zoé Bernard"]);
   });

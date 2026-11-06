@@ -40,6 +40,9 @@ import { Client } from "pg";
 // mon_invitation et activer_mon_compte (sur auth.uid() seulement) pour
 // authenticated ; creer_membre (nouvelle signature) reste réservée à
 // service_role ; rien pour anon.
+// Story 4.2 : modifier_membre, desactiver_membre, reactiver_membre pour
+// authenticated (les fonctions vérifient l'administrateur actif) ; rien pour
+// anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -61,6 +64,9 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.changer_statut(p_demande_id uuid, p_statut text):EXECUTE",
   "authenticated:fonction:public.classer_sans_suite(p_demande_id uuid, p_note text):EXECUTE",
   "authenticated:fonction:public.lister_comptes():EXECUTE",
+  "authenticated:fonction:public.modifier_membre(p_id uuid, p_nom text, p_role text):EXECUTE",
+  "authenticated:fonction:public.desactiver_membre(p_id uuid):EXECUTE",
+  "authenticated:fonction:public.reactiver_membre(p_id uuid):EXECUTE",
   "authenticated:fonction:public.mon_invitation():EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
