@@ -114,7 +114,15 @@ describe("lister_comptes", () => {
     expect(error).toBeNull();
     const liste = data as { id: string; nom: string; email: string; role: string; etat: string }[];
     const leo = liste.find((c) => c.id === invite.id);
-    expect(leo).toEqual({ id: invite.id, nom: invite.nom, email: invite.email, role: "collaborateur", etat: "invite" });
+    // Story 4.2 : plus le nombre de demandes En cours.
+    expect(leo).toEqual({
+      id: invite.id,
+      nom: invite.nom,
+      email: invite.email,
+      role: "collaborateur",
+      etat: "invite",
+      demandes_en_cours: 0,
+    });
     expect(liste.find((c) => c.id === desactive.id)?.etat).toBe("desactive");
     // Ordre comparé à celui de la base elle-même (même collation, mêmes
     // lignes), jamais retrié en JS : la base partagée contient des noms
@@ -290,10 +298,16 @@ describe("verifier_email_libre", () => {
   it.each([
     ["membre actif (casse différente)", () => collaborateur.email.toUpperCase()],
     ["membre invité", () => invite.email],
-    ["membre désactivé", () => desactive.email],
   ])("%s : EMAIL_DEJA_UTILISE", async (_cas, adresse) => {
     const { error } = await clientServiceTest().rpc("verifier_email_libre", { p_email: adresse() });
     expect(error).toMatchObject({ code: "P0001", message: "EMAIL_DEJA_UTILISE" });
+  });
+
+  // Story 4.2 : l'adresse d'un compte désactivé propose « Réactiver ce compte ».
+  it("membre désactivé : COMPTE_DESACTIVE, son identifiant en détail", async () => {
+    const { error } = await clientServiceTest().rpc("verifier_email_libre", { p_email: desactive.email });
+    expect(error).toMatchObject({ code: "P0001", message: "COMPTE_DESACTIVE" });
+    expect(JSON.parse(error?.details ?? "{}")).toEqual({ id: desactive.id });
   });
 
   it("compte Auth sans membre : EMAIL_DEJA_UTILISE", async () => {

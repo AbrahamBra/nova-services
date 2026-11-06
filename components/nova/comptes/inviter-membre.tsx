@@ -3,6 +3,7 @@
 import {
   startTransition,
   useActionState,
+  useTransition,
   useEffect,
   useId,
   useRef,
@@ -13,6 +14,8 @@ import { unstable_rethrow } from "next/navigation";
 import { CLASSE_CHAMP, CLASSE_LIBELLE, MessageErreur } from "@/components/formulaire-depot";
 import { CopierReference } from "@/components/copier-reference";
 import { Bouton } from "@/components/nova/bouton";
+import { reactiverDepuisEcran } from "@/components/nova/comptes/actions-compte";
+import { useToasts } from "@/components/nova/toasts";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { inviter } from "@/lib/actions/admin";
 import { messageErreur } from "@/lib/erreurs";
+import { MESSAGES_COMPTE } from "@/lib/schemas/compte";
 import {
   ETAT_INVITATION_INITIAL,
   OPTIONS_ROLE,
@@ -50,6 +54,9 @@ import {
 //     email n'est envoyé) : le lien en lecture seule, « Copier » et
 //     « Ce lien est valable 24 h. ».
 // La liste des comptes est rafraîchie par l'action (revalidatePath).
+// Story 4.2 : adresse d'un compte désactivé, « Cette adresse appartient à un
+// compte désactivé. » sous Email et un bouton « Réactiver ce compte » qui
+// réactive ce membre, ferme la fenêtre et affiche le toast.
 
 async function envoyerAuServeur(etat: EtatInvitation, donnees: FormData): Promise<EtatInvitation> {
   try {
@@ -75,6 +82,7 @@ export function InviterMembre() {
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const boutonRef = useRef<HTMLButtonElement>(null);
   const invitationRef = useRef<InvitationCreee | null>(null);
+  const { afficher } = useToasts();
   useEffect(() => {
     invitationRef.current = invitation;
   }, [invitation]);
@@ -125,6 +133,11 @@ export function InviterMembre() {
             }}
             onAnnuler={() => setOuverte(false)}
             onOccupe={setEnvoiEnCours}
+            onReactive={() => {
+              setEnvoiEnCours(false);
+              setOuverte(false);
+              afficher("succes", MESSAGES_COMPTE.reactive);
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -153,11 +166,14 @@ function FormulaireInvitation({
   onInvite,
   onAnnuler,
   onOccupe,
+  onReactive,
 }: {
   onInvite: (invitation: InvitationCreee) => void;
   onAnnuler: () => void;
   /** Signale au parent l'envoi en cours (fermeture bloquée). */
   onOccupe: (occupe: boolean) => void;
+  /** Story 4.2 : compte désactivé réactivé depuis la fenêtre. */
+  onReactive: () => void;
 }) {
   const id = useId();
   const bandeauRef = useRef<HTMLDivElement>(null);
@@ -165,11 +181,29 @@ function FormulaireInvitation({
 
   const [erreurs, setErreurs] = useState<ErreursInvitation>({});
   const [erreurGenerale, setErreurGenerale] = useState<string | null>(null);
+  // Story 4.2 : compte désactivé proposé à la réactivation (adresse saisie).
+  const [compteDesactive, setCompteDesactive] = useState<string | null>(null);
+  const [reactivation, demarrerReactivation] = useTransition();
   const [tentativeVue, setTentativeVue] = useState(etat.tentative);
   if (etat.tentative !== tentativeVue) {
     setTentativeVue(etat.tentative);
     setErreurs(etat.erreurs);
     setErreurGenerale(etat.erreurGenerale);
+    setCompteDesactive(etat.compteDesactive?.id ?? null);
+  }
+
+  function reactiver() {
+    if (!compteDesactive || reactivation) return;
+    const id = compteDesactive;
+    demarrerReactivation(async () => {
+      const resultat = await reactiverDepuisEcran(id);
+      if (resultat.ok) {
+        onReactive();
+      } else {
+        setErreurGenerale(resultat.message);
+        requestAnimationFrame(() => bandeauRef.current?.focus());
+      }
+    });
   }
 
   const idChamp = (champ: ChampInvitation) => `${id}-${champ}`;
@@ -207,6 +241,7 @@ function FormulaireInvitation({
 
     setErreurs({});
     setErreurGenerale(null);
+    setCompteDesactive(null);
     startTransition(() => envoyer(donnees));
   }
 
@@ -218,11 +253,12 @@ function FormulaireInvitation({
     };
   }
 
-  const occupe = enCours || etat.invitation !== null;
+  const occupe = enCours || reactivation || etat.invitation !== null;
 
+  // Invitation ou « Réactiver ce compte » en cours : fermeture bloquée.
   useEffect(() => {
-    onOccupe(enCours);
-  }, [enCours, onOccupe]);
+    onOccupe(enCours || reactivation);
+  }, [enCours, reactivation, onOccupe]);
 
   return (
     <>
@@ -239,6 +275,7 @@ function FormulaireInvitation({
         onSubmit={soumettre}
         onChange={(evenement) => {
           const nom = (evenement.target as unknown as { name?: unknown }).name;
+          if (nom === "email") setCompteDesactive(null);
           if (typeof nom === "string" && nom in erreurs) {
             setErreurs((actuelles) => {
               const suivantes = { ...actuelles };
@@ -293,6 +330,17 @@ function FormulaireInvitation({
             />
           </div>
           <MessageErreur id={idErreur("email")} message={erreurs.email} />
+          {compteDesactive && erreurs.email ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={reactiver}
+              disabled={occupe}
+              className="mt-2 h-9 rounded-md bg-surface px-3 text-[13px] font-semibold text-foreground"
+            >
+              {reactivation ? "Réactivation…" : "Réactiver ce compte"}
+            </Button>
+          ) : null}
         </div>
 
         <div>

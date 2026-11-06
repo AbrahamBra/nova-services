@@ -121,6 +121,23 @@ describe("sécurité — droits de service_role sur les tables", () => {
     });
   });
 
+  // Story 4.2 : modifier, désactiver, réactiver un compte se font avec la
+  // session de l'administrateur (auth.uid()), jamais avec la clé secrète.
+  it("aucun droit sur modifier_membre, desactiver_membre ni reactiver_membre", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.modifier_membre(uuid, text, text)',
+                         'public.desactiver_membre(uuid)',
+                         'public.reactiver_membre(uuid)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.desactiver_membre(uuid)": false,
+      "public.modifier_membre(uuid, text, text)": false,
+      "public.reactiver_membre(uuid)": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

@@ -4,7 +4,7 @@ import { messageErreur } from "@/lib/erreurs";
 import { appeler, type ClientRpc, type Resultat } from "@/lib/server/appeler";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
-// Comptes de l'équipe (story 4.1, page Comptes) : lus avec la session de
+// Comptes de l'équipe (stories 4.1 et 4.2, page Comptes) : lus avec la session de
 // l'administrateur par `lister_comptes()` (la base refuse toute autre
 // personne : DROIT_INSUFFISANT).
 
@@ -14,6 +14,8 @@ export type Compte = {
   email: string;
   role: Role;
   etat: EtatMembre;
+  /** Story 4.2 : demandes En cours dont il est responsable (fenêtre « Désactiver »). */
+  demandesEnCours: number;
 };
 
 const ECHEC = {
@@ -38,7 +40,10 @@ export function lireReponseComptes(valeur: unknown): Compte[] | null {
       typeof v.role !== "string" ||
       !(ROLES as readonly string[]).includes(v.role) ||
       typeof v.etat !== "string" ||
-      !(ETATS_MEMBRE as readonly string[]).includes(v.etat)
+      !(ETATS_MEMBRE as readonly string[]).includes(v.etat) ||
+      typeof v.demandes_en_cours !== "number" ||
+      !Number.isInteger(v.demandes_en_cours) ||
+      v.demandes_en_cours < 0
     ) {
       return null;
     }
@@ -48,6 +53,7 @@ export function lireReponseComptes(valeur: unknown): Compte[] | null {
       email: v.email,
       role: v.role as Role,
       etat: v.etat as EtatMembre,
+      demandesEnCours: v.demandes_en_cours,
     });
   }
   // Tri par nom, à la française (accents et majuscules ignorés).

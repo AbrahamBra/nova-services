@@ -97,6 +97,11 @@ export type EtatInvitation = {
   tentative: number;
   /** Invitation créée (réussite), sinon null. */
   invitation: InvitationCreee | null;
+  /**
+   * Story 4.2 : l'adresse appartient à un compte désactivé ; la fenêtre
+   * propose « Réactiver ce compte ». Absent sinon.
+   */
+  compteDesactive?: { id: string };
 };
 
 export const ETAT_INVITATION_INITIAL: EtatInvitation = {

@@ -1,11 +1,12 @@
+import { ActionsCompte } from "@/components/nova/comptes/actions-compte";
 import type { Compte } from "@/lib/comptes";
 import { LIBELLES_ETAT_MEMBRE, LIBELLES_ROLE, type EtatMembre } from "@/lib/domaine";
 import { cn } from "@/lib/utils";
 
 // Liste des comptes (EXPERIENCE.md §9.7, story 4.1) : tableau Nom · Email ·
 // Rôle · État sur tablette et ordinateur ; une carte par compte sur
-// téléphone (< 640 px). Trié par nom (lib/comptes.ts). Les actions par
-// ligne arrivent avec les stories 4.2 à 4.4.
+// téléphone (< 640 px). Trié par nom (lib/comptes.ts). Story 4.2 : colonne
+// Actions (Modifier, Désactiver, Réactiver selon l'état, actions-compte.tsx).
 
 /** Seul l'administrateur connecté : message de liste vide. */
 export const MESSAGE_AUCUN_COMPTE = "Aucun autre compte. Invitez un premier collaborateur.";
@@ -60,6 +61,7 @@ export function ListeComptes({ comptes, idConnecte }: { comptes: Compte[]; idCon
               <th scope="col" className={CLASSE_ENTETE}>Email</th>
               <th scope="col" className={CLASSE_ENTETE}>Rôle</th>
               <th scope="col" className={CLASSE_ENTETE}>État</th>
+              <th scope="col" className={CLASSE_ENTETE}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -75,6 +77,9 @@ export function ListeComptes({ comptes, idConnecte }: { comptes: Compte[]; idCon
                 <td className={`${CLASSE_CELLULE} whitespace-nowrap`}>{LIBELLES_ROLE[compte.role]}</td>
                 <td className={CLASSE_CELLULE}>
                   <BadgeEtatMembre etat={compte.etat} />
+                </td>
+                <td className={`${CLASSE_CELLULE} py-2`}>
+                  <ActionsCompte compte={compte} estMoi={compte.id === idConnecte} />
                 </td>
               </tr>
             ))}
@@ -101,6 +106,9 @@ export function ListeComptes({ comptes, idConnecte }: { comptes: Compte[]; idCon
             </div>
             <p className="mt-1 text-[13px] wrap-anywhere text-muted-foreground">{compte.email}</p>
             <p className="mt-1 text-[13px]">{LIBELLES_ROLE[compte.role]}</p>
+            <div className="mt-3">
+              <ActionsCompte compte={compte} estMoi={compte.id === idConnecte} />
+            </div>
           </li>
         ))}
       </ul>

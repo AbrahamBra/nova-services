@@ -4,9 +4,10 @@ import {
   ListeComptes,
   MESSAGE_AUCUN_COMPTE,
 } from "@/components/nova/comptes/liste-comptes";
+import { FournisseurToasts } from "@/components/nova/toasts";
 import type { Compte } from "@/lib/comptes";
 
-// Story 4.1 — liste des comptes sans base : état vide (seul l'administrateur
+// Story 4.1 (colonne Actions : 4.2) — liste des comptes sans base : état vide (seul l'administrateur
 // connecté, la base partagée n'est jamais vide), tableau et cartes, libellés
 // du rôle et de l'état.
 
@@ -16,6 +17,7 @@ const MOI: Compte = {
   email: "claire@example.com",
   role: "administrateur",
   etat: "actif",
+  demandesEnCours: 0,
 };
 const LEO: Compte = {
   id: "leo",
@@ -23,6 +25,7 @@ const LEO: Compte = {
   email: "leo@example.com",
   role: "collaborateur",
   etat: "invite",
+  demandesEnCours: 0,
 };
 
 describe("ListeComptes", () => {
@@ -34,10 +37,15 @@ describe("ListeComptes", () => {
   });
 
   it("tableau Nom · Email · Rôle · État, et une carte par compte sur téléphone", () => {
-    const html = renderToStaticMarkup(<ListeComptes comptes={[MOI, LEO]} idConnecte="moi" />);
+    const html = renderToStaticMarkup(
+      <FournisseurToasts>
+        <ListeComptes comptes={[MOI, LEO]} idConnecte="moi" />
+      </FournisseurToasts>,
+    );
     expect(html).not.toContain(MESSAGE_AUCUN_COMPTE);
     const entetes = [...html.matchAll(/<th scope="col"[^>]*>([^<]+)<\/th>/g)].map(([, t]) => t);
-    expect(entetes).toEqual(["Nom", "Email", "Rôle", "État"]);
+    // Story 4.2 : colonne Actions.
+    expect(entetes).toEqual(["Nom", "Email", "Rôle", "État", "Actions"]);
     expect(html).toContain("Invité");
     expect(html).toContain("Collaborateur");
     expect(html).toContain("Administrateur");
