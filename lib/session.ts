@@ -104,3 +104,33 @@ export const lireProfil = cache(async (): Promise<Resultat<Profil | null>> => {
   if (profil.donnees === null) return { ok: true, donnees: null };
   return { ok: true, donnees: { ...profil.donnees, id } };
 });
+
+/**
+ * Invitation du compte connecté (story 4.1) : `mon_invitation()` donne son nom
+ * s'il est encore à l'état `invite`. `null` : pas d'invitation en cours
+ * (actif, désactivé, sans membre) ; `undefined` : erreur.
+ */
+export async function invitationDuClient(
+  client: ClientRpc,
+): Promise<{ nom: string; prenom: string } | null | undefined> {
+  const resultat = await appeler<unknown>(client, "mon_invitation");
+  if (!resultat.ok) return undefined;
+  if (resultat.donnees === null) return null;
+  const nom = (resultat.donnees as { nom?: unknown } | null)?.nom;
+  if (typeof nom !== "string" || nom === "") {
+    console.error("[session] réponse inattendue de mon_invitation");
+    return undefined;
+  }
+  return { nom, prenom: prenomDe(nom) };
+}
+
+/**
+ * Vrai si une erreur de Supabase Auth est une panne passagère (réseau,
+ * limite de requêtes 429, erreur 5xx) et non un refus : à afficher comme une
+ * erreur serveur, avec « Réessayer », jamais comme un lien plus valable.
+ */
+export function estPanneAuth(erreur: unknown): boolean {
+  if (isAuthRetryableFetchError(erreur)) return true;
+  const statut = (erreur as { status?: unknown } | null)?.status;
+  return typeof statut === "number" && (statut === 429 || statut >= 500);
+}

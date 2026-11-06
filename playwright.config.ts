@@ -37,6 +37,14 @@ export default defineConfig({
     // test dépose avec sa propre adresse sans atteindre la limite d'envois
     // (tests/outils/ip-test.ts). Seulement pour le serveur lancé ici, sur le
     // port dédié aux tests.
-    env: { IP_DE_TEST_AUTORISEE: "1" },
+    // Story 4.1 : les liens d'invitation pointent vers ce serveur. Sentry
+    // coupé pour ce serveur (DSN vide : non remplacé par .env.local) : les
+    // tests provoquent volontairement des erreurs (retour arrière, compte
+    // existant, page de test) qui ne doivent jamais créer d'alerte réelle.
+    env: {
+      IP_DE_TEST_AUTORISEE: "1",
+      NEXT_PUBLIC_SITE_URL: `http://localhost:${PORT}`,
+      NEXT_PUBLIC_SENTRY_DSN: "",
+    },
   },
 });

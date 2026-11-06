@@ -36,6 +36,10 @@ import { Client } from "pg";
 // Story 2.7 : liberer et attribuer pour le membre connecté (les fonctions
 // vérifient elles-mêmes le membre actif, l'administrateur pour attribuer) ;
 // rien pour anon.
+// Story 4.1 : lister_comptes (la fonction vérifie l'administrateur actif),
+// mon_invitation et activer_mon_compte (sur auth.uid() seulement) pour
+// authenticated ; creer_membre (nouvelle signature) reste réservée à
+// service_role ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -49,12 +53,15 @@ const COLONNES_NOTES = ["id", "demande_id", "auteur_id", "texte", "cree_le"];
 const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
+  "authenticated:fonction:public.activer_mon_compte():EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
   "authenticated:fonction:public.attribuer(p_demande_id uuid, p_membre_id uuid):EXECUTE",
   "authenticated:fonction:public.changer_categorie(p_demande_id uuid, p_categorie_id uuid):EXECUTE",
   "authenticated:fonction:public.changer_priorite(p_demande_id uuid, p_priorite text):EXECUTE",
   "authenticated:fonction:public.changer_statut(p_demande_id uuid, p_statut text):EXECUTE",
   "authenticated:fonction:public.classer_sans_suite(p_demande_id uuid, p_note text):EXECUTE",
+  "authenticated:fonction:public.lister_comptes():EXECUTE",
+  "authenticated:fonction:public.mon_invitation():EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
   "authenticated:fonction:public.liberer(p_demande_id uuid):EXECUTE",

@@ -431,6 +431,8 @@ describe("droits EXECUTE (AD-15, AD-16)", () => {
       "noter_resultat_email",
       // Story 1.9 : résultat d'une tentative de connexion.
       "terminer_connexion",
+      // Story 4.1 : adresse libre vérifiée avant une invitation.
+      "verifier_email_libre",
     ]);
   });
 

@@ -143,3 +143,33 @@ export async function avecBase<T>(travail: (base: Client) => Promise<T>): Promis
     await base.end();
   }
 }
+
+/**
+ * Story 4.1 — efface les lignes du journal écrites par des comptes de test
+ * (le journal cite ses auteurs : sans cela, leur ligne `membres` ne peut pas
+ * être supprimée). L'effacement du journal n'est permis qu'avec le drapeau
+ * de transaction `nova.purge_journal` (migration 0010) ; garde-fou en SQL :
+ * seulement les auteurs dont le nom commence par `TEST-`.
+ */
+export async function effacerJournalDesComptesTest(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  return avecBase(async (base) => {
+    await base.query("begin");
+    try {
+      await base.query("select set_config('nova.purge_journal', 'on', true)");
+      const { rowCount } = await base.query(
+        `delete from public.journal j
+          using public.membres m
+          where m.id = j.auteur_id
+            and m.id = any($1::uuid[])
+            and m.nom like 'TEST-%'`,
+        [ids],
+      );
+      await base.query("commit");
+      return rowCount ?? 0;
+    } catch (erreur) {
+      await base.query("rollback").catch(() => {});
+      throw erreur;
+    }
+  });
+}

@@ -179,10 +179,12 @@ describe("prive.est_membre_actif et prive.est_admin", () => {
 });
 
 describe("creer_membre — droits EXECUTE", () => {
+  // Story 4.1 : signature avec l'auteur facultatif (p_auteur_id) ; l'ancienne
+  // signature à 5 paramètres n'existe plus.
   it("réservée à service_role dans le catalogue", async () => {
     const { rows } = await base.query<{ role: string; peut: boolean }>(
       `select r as role,
-              has_function_privilege(r, 'public.creer_membre(uuid, text, text, text, text)', 'EXECUTE') as peut
+              has_function_privilege(r, 'public.creer_membre(uuid, text, text, text, text, uuid)', 'EXECUTE') as peut
          from unnest(array['anon', 'authenticated', 'service_role']) as r`,
     );
     expect(Object.fromEntries(rows.map((l) => [l.role, l.peut]))).toEqual({
