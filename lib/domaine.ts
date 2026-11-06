@@ -210,3 +210,7 @@ export const PHRASES_HISTORIQUE: Record<
   note_ajoutee: () => "a ajouté une note interne",
   retour_nouvelle: () => "a remis la demande en Nouvelle",
 };
+
+/** Aucune demande du tout : tableau de bord (story 2.8) et liste sans filtre. */
+export const MESSAGE_AUCUNE_DEMANDE =
+  "Aucune demande pour l'instant. Partagez le lien du formulaire à vos clients.";

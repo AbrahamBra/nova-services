@@ -7,6 +7,7 @@ import { FournisseurToasts } from "@/components/nova/toasts";
 import { LIBELLES_ROLE } from "@/lib/domaine";
 import { adresseDeRetour } from "@/lib/schemas/connexion";
 import { lireProfil } from "@/lib/session";
+import { lireCompteurMenu } from "@/lib/tableau-de-bord";
 import { ENTETE_CHEMIN } from "@/lib/supabase/proxy";
 
 // Mise en page de l'espace équipe (AD-28) : vérifie que la personne
@@ -15,6 +16,11 @@ import { ENTETE_CHEMIN } from "@/lib/supabase/proxy";
 // Story 2.1 : fournisseur des toasts, commun à toutes les actions.
 // Story 3.1 : version de l'application en bas de chaque page interne
 // (AD-11), injectée au build par next.config.ts.
+// Story 2.8 : compteur du menu (demandes « À prendre en charge »), lu ici en
+// même temps que le profil comme valeur initiale ; la mise en page n'étant
+// pas rendue de nouveau lors d'une navigation dans l'application, le menu le
+// relit ensuite à chaque changement de page (action `lireCompteurDemandes`).
+// Masqué à 0 ou en cas d'erreur.
 // Jamais mise en cache.
 export const dynamic = "force-dynamic";
 
@@ -23,7 +29,9 @@ export const metadata: Metadata = {
 };
 
 export default async function MiseEnPageEquipe({ children }: LayoutProps<"/equipe">) {
-  const profil = await lireProfil();
+  // Profil et compteur du menu lus en parallèle (sans membre actif, la vue ne
+  // renvoie rien : le compteur n'est jamais affiché).
+  const [profil, aPrendreEnCharge] = await Promise.all([lireProfil(), lireCompteurMenu()]);
 
   if (!profil.ok) {
     return (
@@ -51,7 +59,12 @@ export default async function MiseEnPageEquipe({ children }: LayoutProps<"/equip
   return (
     <FournisseurToasts>
       <div className="flex min-h-full flex-1 flex-col lg:flex-row">
-        <MenuEquipe nom={nom} libelleRole={LIBELLES_ROLE[role]} estAdmin={estAdmin} />
+        <MenuEquipe
+          nom={nom}
+          libelleRole={LIBELLES_ROLE[role]}
+          estAdmin={estAdmin}
+          aPrendreEnCharge={aPrendreEnCharge}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
           <footer className="px-4 pb-4 text-[13px] text-muted-foreground md:px-8">
