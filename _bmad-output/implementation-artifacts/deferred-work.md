@@ -117,3 +117,13 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-2-modifier-desactiver-reactiver.md`
   summary: Une prise en charge au même instant qu'une désactivation peut laisser une demande En cours au nom d'un compte désactivé.
   evidence: non vérifié (medium s'il est réel) ; `prendre_en_charge` ne verrouille pas la ligne `membres` ; à corriger par un `for share` sur le membre dans `prendre_en_charge`.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
+  summary: Faire écrire `effacer_demandeur` (epic 5) dans `effacements`, avec un test, puis refaire l'essai de restauration après la story 5.4 en vérifiant un vrai rejeu.
+  evidence: Le registre n'est rempli par rien aujourd'hui ; seul un commentaire de la migration le rappelle.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
+  summary: Sortir le comptage des lignes et la comparaison de « Restauration de test » dans un script testé par Vitest avec un `donnees.sql` d'exemple.
+  evidence: Le test actuel ne lit que le texte du fichier ; la première exécution réelle sert de vérification.
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
+  summary: Épingler `supabase/setup-cli` par empreinte de commit dans les tâches qui voient `SAUVEGARDE_PHRASE`.
+  evidence: Même report que pour la story 3.2.
