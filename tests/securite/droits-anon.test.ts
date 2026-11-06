@@ -43,6 +43,8 @@ import { Client } from "pg";
 // Story 4.2 : modifier_membre, desactiver_membre, reactiver_membre pour
 // authenticated (les fonctions vérifient l'administrateur actif) ; rien pour
 // anon.
+// Story 3.4 : table effacements et rejouer_effacements, aucun droit (rien à
+// ajouter : service_role seulement).
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",

@@ -2,7 +2,7 @@
 title: 'Story 3.5 — Revenir à la version précédente (essai réel)'
 type: 'chore'
 created: '2026-11-06'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '23de91510bd04fb1cb9c4313b5552ad200e633b1'
 route: 'oneshot'
 review_loop_iteration: 0
@@ -37,3 +37,4 @@ context:
 
 - La publication d'un déploiement existant ne reconstruit rien : elle ne coûte pas de crédits de construction.
 - Les deux demandes de contrôle restent en production comme demandes réelles (effacement : epic 5).
+- 06/11/2026 : essai réel réussi (14 h 48 → 14 h 57), voir `docs/exploitation/retour-arriere.md`. La publication automatique n'a pas été verrouillée par Netlify.

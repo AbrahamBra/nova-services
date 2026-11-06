@@ -275,6 +275,7 @@ Seules les flèches dessinées sont permises.
   - **Chaque nuit**, une tâche GitHub Actions se connecte à la production par le **pooler en mode session** et exporte trois fichiers : rôles, structure, et données y compris les comptes (`--data-only --use-copy`). Elle les chiffre avec une phrase secrète (secret GitHub) et les garde 30 jours.
   - La même tâche peut être lancée à la main avant une mise en ligne.
   - La **restauration de test** se fait dans GitHub Actions vers le projet de développement, puis on y appelle `rejouer_effacements()`. Le projet dev est remis à ses données fictives après l'essai.
+    - **Décision du 06/11/2026 (story 3.4)** : la restauration de test se fait dans une base Supabase jetable créée dans la machine GitHub Actions, et non dans `nova-dev` (base partagée) ; `nova-dev` n'est jamais touché, la remise à ses données fictives devient sans objet.
   - Une tâche quotidienne interroge les deux projets pour éviter leur mise en pause.
 
 ### AD-13 — Emails : un seul module, mode démonstration à 0 € [ADOPTÉ]

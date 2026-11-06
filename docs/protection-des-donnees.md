@@ -24,7 +24,7 @@ Rien d'autre n'est collecté : pas de suivi publicitaire, pas d'outil de mesure 
 
 Une personne peut demander que ses données soient effacées. L'administrateur retrouve ses demandes par son email et les efface définitivement, avec leur historique et leurs notes. À compléter (epic 5) : écran et procédure exacts.
 
-Les sauvegardes qui contiennent encore ces données disparaissent d'elles-mêmes au bout de 30 jours. Si une sauvegarde plus ancienne que l'effacement est restaurée, l'effacement devra être refait, avec la fonction `rejouer_effacements()` qui sera créée à la story 3.4 (voir [restauration.md](exploitation/restauration.md)). À compléter (story 3.4).
+Les sauvegardes qui contiennent encore ces données disparaissent d'elles-mêmes au bout de 30 jours. Si une sauvegarde plus ancienne que l'effacement est restaurée, l'effacement est refait avec la fonction `rejouer_effacements()` (voir [restauration.md](exploitation/restauration.md)) : elle s'appuie sur le registre `effacements`, qui ne garde que la référence de la demande effacée et la date, aucune donnée de la personne.
 
 ## Données de test
 

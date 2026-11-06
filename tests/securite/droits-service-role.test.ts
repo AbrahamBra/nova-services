@@ -23,6 +23,8 @@ const TABLES = [
   "tentatives_connexion",
   // Story 2.2 : notes internes, écrites seulement par ajouter_note.
   "notes",
+  // Story 3.4 : registre des effacements, lu seulement par rejouer_effacements.
+  "effacements",
 ];
 const DROITS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
 
@@ -136,6 +138,15 @@ describe("sécurité — droits de service_role sur les tables", () => {
       "public.modifier_membre(uuid, text, text)": false,
       "public.reactiver_membre(uuid)": false,
     });
+  });
+
+  // Story 3.4 : le rejeu des effacements, après une restauration, se lance
+  // avec la clé secrète (AD-15, AD-30).
+  it("rejouer_effacements permise", async () => {
+    const { rows } = await client.query<{ peut: boolean }>(
+      `select has_function_privilege('service_role', 'public.rejouer_effacements()', 'EXECUTE') as peut`,
+    );
+    expect(rows[0].peut).toBe(true);
   });
 
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {

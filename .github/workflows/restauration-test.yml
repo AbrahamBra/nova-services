@@ -1,0 +1,350 @@
+name: Restauration de test
+
+# Restaure la dernière sauvegarde de production dans une base Supabase
+# JETABLE, créée dans la machine de GitHub et détruite à la fin (OPS-4,
+# AD-12, AD-30). Décision d'Abraham du 06/11/2026 : jamais dans `nova-dev`
+# (base partagée) ni en production. La tâche n'a donc aucune adresse de base :
+# seulement la phrase SAUVEGARDE_PHRASE et le jeton GitHub de l'exécution.
+#
+# Étapes : télécharger le fichier chiffré de « Sauvegarde nocturne »,
+# vérifier et déchiffrer, démarrer une base locale vide (sans les migrations
+# du dépôt ni seed.sql : la structure vient de la sauvegarde), restaurer
+# roles.sql, structure.sql puis donnees.sql en une transaction (méthode de la
+# documentation Supabase « Backup and restore using CLI »), rejouer les
+# effacements, comparer les nombres et publier un rapport.
+#
+# Le dépôt est public : aucune donnée de la sauvegarde n'apparaît dans les
+# journaux (erreurs SQL réduites à leur code) et rien n'est publié en artefact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      execution:
+        description: "Numéro d'exécution de « Sauvegarde nocturne » à restaurer (vide : la plus récente)"
+        required: false
+        default: ""
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: restauration-test
+  cancel-in-progress: false
+
+jobs:
+  restauration:
+    name: Restaurer dans une base jetable et comparer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        # -eo pipefail : une erreur au milieu d'un « | » fait échouer l'étape.
+        shell: bash
+    env:
+      SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
+      GH_TOKEN: ${{ github.token }}
+      EXECUTION: ${{ inputs.execution }}
+    steps:
+      - name: Vérifier la phrase de chiffrement
+        run: |
+          # `runner.temp` n'existe pas au niveau de la tâche : chemins posés ici.
+          echo "DUREES=$RUNNER_TEMP/durees" >> "$GITHUB_ENV"
+          echo "DEBUT_RESTAURATION=$(date +%s)" >> "$GITHUB_ENV"
+          : > "$RUNNER_TEMP/durees"
+          if [ -z "$SAUVEGARDE_PHRASE" ]; then
+            echo "::error::Phrase de chiffrement absente : créez le secret SAUVEGARDE_PHRASE. Rien n'a été restauré."
+            exit 1
+          fi
+          if [ "${#SAUVEGARDE_PHRASE}" -lt 32 ]; then
+            echo "::error::Phrase de chiffrement trop courte : 32 caractères au minimum. Rien n'a été restauré."
+            exit 1
+          fi
+          if [[ "$SAUVEGARDE_PHRASE" == *$'\n'* || "$SAUVEGARDE_PHRASE" == *$'\r'* ]]; then
+            echo "::error::Phrase de chiffrement refusée : elle ne doit contenir aucun retour à la ligne. Rien n'a été restauré."
+            exit 1
+          fi
+          echo "Phrase de chiffrement présente."
+
+      - name: Trouver la sauvegarde de production
+        id: sauvegarde
+        run: |
+          debut=$(date +%s)
+          trouve=""
+          if [ -n "$EXECUTION" ]; then
+            if [[ ! "$EXECUTION" =~ ^[0-9]+$ ]]; then
+              echo "::error::Numéro d'exécution invalide : chiffres seulement."
+              exit 1
+            fi
+            # Exécution inexistante (404) : message de la procédure, pas l'erreur brute.
+            chemin=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$EXECUTION"               --jq '.path + " " + (.conclusion // "")' 2>/dev/null) || chemin=""
+            if [ "$chemin" != ".github/workflows/sauvegarde-nocturne.yml success" ]; then
+              echo "::error::L'exécution $EXECUTION n'est pas une « Sauvegarde nocturne » réussie."
+              exit 1
+            fi
+            executions="$EXECUTION"
+          else
+            executions=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow sauvegarde-nocturne.yml \
+              --status success --limit 40 --json databaseId --jq '.[].databaseId')
+          fi
+          for execution in $executions; do
+            trouve=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$execution/artifacts" \
+              --jq '[.artifacts[] | select(.expired == false) | select(.name | startswith("sauvegarde-production-"))][0] // empty | .name + " " + .created_at')
+            if [ -n "$trouve" ]; then
+              break
+            fi
+          done
+          if [ -z "$trouve" ]; then
+            echo "::error::Aucune sauvegarde de production disponible (fichiers de « Sauvegarde nocturne » de moins de 30 jours). Rien n'a été restauré."
+            exit 1
+          fi
+          read -r nom date_sauvegarde <<< "$trouve"
+          if [[ ! "$nom" =~ ^sauvegarde-production-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+-[0-9]+$ ]]; then
+            echo "::error::Nom de fichier de sauvegarde inattendu."
+            exit 1
+          fi
+          echo "execution=$execution" >> "$GITHUB_OUTPUT"
+          echo "nom=$nom" >> "$GITHUB_OUTPUT"
+          echo "date=$date_sauvegarde" >> "$GITHUB_OUTPUT"
+          echo "Sauvegarde retenue : $nom ($date_sauvegarde)."
+          echo "Trouver la sauvegarde|$(( $(date +%s) - debut ))" >> "$DUREES"
+
+      - name: Télécharger, vérifier et déchiffrer
+        env:
+          EXECUTION_SAUVEGARDE: ${{ steps.sauvegarde.outputs.execution }}
+          NOM: ${{ steps.sauvegarde.outputs.nom }}
+        run: |
+          debut=$(date +%s)
+          umask 077
+          telechargement="$RUNNER_TEMP/telechargement"
+          dossier="$RUNNER_TEMP/restauration"
+          phrase="$RUNNER_TEMP/phrase"
+          mkdir -p "$telechargement" "$dossier"
+          gh run download "$EXECUTION_SAUVEGARDE" --repo "$GITHUB_REPOSITORY" --name "$NOM" --dir "$telechargement"
+          chiffre="$telechargement/sauvegarde.tar.gz.gpg"
+          if [ ! -s "$chiffre" ]; then
+            echo "::error::Fichier sauvegarde.tar.gz.gpg absent ou vide dans $NOM."
+            exit 1
+          fi
+          # La phrase passe par un fichier temporaire (printf est interne au
+          # shell : elle n'apparaît dans aucun argument de programme).
+          printf '%s' "$SAUVEGARDE_PHRASE" > "$phrase"
+          gpgconf --kill gpg-agent || true
+
+          # Structure OpenPGP : paquet de clé symétrique puis données chiffrées.
+          paquets=$(gpg --batch --no-symkey-cache --pinentry-mode loopback \
+              --passphrase-file "$phrase" --list-packets "$chiffre" 2>/dev/null \
+            | grep -E '^:[a-z ]+packet:' || true)
+          if ! grep -q '^:symkey enc packet:' <<< "$paquets" \
+            || ! grep -q -E '^:(encrypted data|aead encrypted) packet:' <<< "$paquets"; then
+            echo "::error::Le fichier n'a pas la structure d'un fichier chiffré par phrase (OpenPGP). Rien n'a été restauré."
+            exit 1
+          fi
+
+          if ! gpg --batch --yes --no-symkey-cache --pinentry-mode loopback \
+              --passphrase-file "$phrase" --decrypt -o "$RUNNER_TEMP/sauvegarde.tar.gz" "$chiffre" 2>/dev/null; then
+            echo "::error::Déchiffrement impossible : phrase fausse (SAUVEGARDE_PHRASE différente de celle de la sauvegarde) ou fichier abîmé. Rien n'a été restauré."
+            exit 1
+          fi
+          rm -f "$phrase"
+          contenu=$(tar -tzf "$RUNNER_TEMP/sauvegarde.tar.gz" | sort | tr '\n' ' ')
+          if [ "$contenu" != "donnees.sql roles.sql structure.sql " ]; then
+            echo "::error::L'archive ne contient pas exactement roles.sql, structure.sql et donnees.sql."
+            exit 1
+          fi
+          tar -C "$dossier" -xzf "$RUNNER_TEMP/sauvegarde.tar.gz"
+          rm -f "$RUNNER_TEMP/sauvegarde.tar.gz"
+          for fichier in roles.sql structure.sql donnees.sql; do
+            if [ ! -s "$dossier/$fichier" ]; then
+              echo "::error::Fichier vide dans la sauvegarde : $fichier."
+              exit 1
+            fi
+          done
+          echo "Sauvegarde déchiffrée : trois fichiers, non vides."
+          echo "Télécharger et déchiffrer|$(( $(date +%s) - debut ))" >> "$DUREES"
+
+      - name: Compter les lignes de la sauvegarde
+        id: fichier
+        run: |
+          # Lignes d'une table dans donnees.sql (format COPY : une ligne par
+          # enregistrement, jusqu'à « \. »). Seul le nombre est affiché.
+          compter() {
+            awk -v schema="$1" -v table="$2" '
+              BEGIN { entete1 = "COPY " schema "." table " "; entete2 = "COPY \"" schema "\".\"" table "\" " }
+              dans && $0 == "\\." { dans = 0; next }
+              dans { n++ ; next }
+              index($0, entete1) == 1 || index($0, entete2) == 1 { dans = 1 }
+              END { print n + 0 }
+            ' "$RUNNER_TEMP/restauration/donnees.sql"
+          }
+          echo "demandes=$(compter public demandes)" >> "$GITHUB_OUTPUT"
+          echo "historique=$(compter public historique)" >> "$GITHUB_OUTPUT"
+          echo "notes=$(compter public notes)" >> "$GITHUB_OUTPUT"
+          echo "membres=$(compter public membres)" >> "$GITHUB_OUTPUT"
+          echo "comptes=$(compter auth users)" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          # Même version que package.json (supabase ~3.0.0).
+          version: 3.0.0
+
+      - name: Démarrer une base Supabase jetable (sans migrations ni seed)
+        run: |
+          debut=$(date +%s)
+          # Projet vide créé pour l'occasion : pas de dossier migrations ni de
+          # seed.sql, la structure viendra de la sauvegarde. Même version de
+          # PostgreSQL que supabase/config.toml.
+          projet="$RUNNER_TEMP/base-jetable"
+          mkdir -p "$projet/supabase"
+          cat > "$projet/supabase/config.toml" <<'CONFIG'
+          project_id = "restauration-test"
+
+          [db]
+          major_version = 17
+
+          [db.seed]
+          enabled = false
+          CONFIG
+          supabase start --workdir "$projet" \
+            --exclude studio,imgproxy,edge-runtime,logflare,vector,mailpit,supavisor > /dev/null
+          adresse=$(supabase status --workdir "$projet" -o env | sed -n 's/^DB_URL="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p')
+          # Garde-fou : la base doit être celle de cette machine, jamais nova-dev
+          # ni la production.
+          if [[ ! "$adresse" =~ ^postgres(ql)?://[^@]+@(127\.0\.0\.1|localhost):[0-9]+/ ]]; then
+            echo "::error::La base de restauration n'est pas locale : arrêt."
+            exit 1
+          fi
+          echo "::add-mask::$adresse"
+          echo "BASE_JETABLE=$adresse" >> "$GITHUB_ENV"
+          echo "Base jetable démarrée sur cette machine."
+          echo "Démarrer la base jetable|$(( $(date +%s) - debut ))" >> "$DUREES"
+
+      - name: Restaurer rôles, structure et données
+        run: |
+          debut=$(date +%s)
+          dossier="$RUNNER_TEMP/restauration"
+          # Une seule transaction, arrêt à la première erreur. VERBOSITY=sqlstate
+          # et SHOW_CONTEXT=never : en cas d'erreur, seul le code est affiché
+          # (jamais une valeur de la sauvegarde).
+          if ! psql --quiet --no-psqlrc \
+              --single-transaction \
+              --variable ON_ERROR_STOP=1 \
+              --variable VERBOSITY=sqlstate \
+              --variable SHOW_CONTEXT=never \
+              --file "$dossier/roles.sql" \
+              --file "$dossier/structure.sql" \
+              --command 'SET session_replication_role = replica' \
+              --file "$dossier/donnees.sql" \
+              --dbname "$BASE_JETABLE" > /dev/null; then
+            echo "::error::Restauration interrompue à la première erreur (code SQL ci-dessus) : rien n'a été gardé."
+            exit 1
+          fi
+          echo "Restauration terminée."
+          echo "Restaurer|$(( $(date +%s) - debut ))" >> "$DUREES"
+
+      - name: Compter, puis rejouer les effacements
+        id: base
+        run: |
+          debut=$(date +%s)
+          requete() {
+            psql --quiet --no-psqlrc --tuples-only --no-align \
+              --variable ON_ERROR_STOP=1 --variable VERBOSITY=sqlstate \
+              --dbname "$BASE_JETABLE" --command "$1"
+          }
+          # Chaque résultat passe par une variable : une erreur de psql fait
+          # échouer l'étape (dans « echo x=$(…) », elle serait masquée).
+          compter_table() {
+            local n
+            n=$(requete "select count(*) from $1") || { echo "::error::Comptage impossible : $1."; exit 1; }
+            echo "$2=$n" >> "$GITHUB_OUTPUT"
+          }
+          compter_table public.demandes demandes
+          compter_table public.historique historique
+          compter_table public.notes notes
+          compter_table public.membres membres
+          compter_table auth.users comptes
+          presente=$(requete "select to_regprocedure('public.rejouer_effacements()') is not null")             || { echo "::error::Vérification de rejouer_effacements impossible."; exit 1; }
+          if [ "$presente" != "t" ]; then
+            echo "::error::Fonction rejouer_effacements absente : la migration 0027 n'était pas appliquée en production au moment de cette sauvegarde."
+            exit 1
+          fi
+          effacees=$(requete 'select public.rejouer_effacements()')             || { echo "::error::Échec de rejouer_effacements()."; exit 1; }
+          echo "effacees=$effacees" >> "$GITHUB_OUTPUT"
+          compter_table public.demandes apres
+          echo "Effacements rejoués."
+          echo "Compter et rejouer les effacements|$(( $(date +%s) - debut ))" >> "$DUREES"
+
+      - name: Comparer et publier le rapport
+        if: always()
+        env:
+          NOM: ${{ steps.sauvegarde.outputs.nom }}
+          DATE_SAUVEGARDE: ${{ steps.sauvegarde.outputs.date }}
+          DEMANDES_FICHIER: ${{ steps.fichier.outputs.demandes }}
+          HISTORIQUE_FICHIER: ${{ steps.fichier.outputs.historique }}
+          NOTES_FICHIER: ${{ steps.fichier.outputs.notes }}
+          MEMBRES_FICHIER: ${{ steps.fichier.outputs.membres }}
+          COMPTES_FICHIER: ${{ steps.fichier.outputs.comptes }}
+          DEMANDES_RESTAUREES: ${{ steps.base.outputs.demandes }}
+          HISTORIQUE_RESTAURE: ${{ steps.base.outputs.historique }}
+          NOTES_RESTAUREES: ${{ steps.base.outputs.notes }}
+          MEMBRES_RESTAURES: ${{ steps.base.outputs.membres }}
+          COMPTES_RESTAURES: ${{ steps.base.outputs.comptes }}
+          EFFACEES: ${{ steps.base.outputs.effacees }}
+          DEMANDES_APRES: ${{ steps.base.outputs.apres }}
+        run: |
+          {
+            echo "## Restauration de test"
+            echo ""
+            echo "Base jetable de cette machine GitHub (ni nova-dev, ni la production)."
+            echo ""
+            echo "| | Nombre |"
+            echo "|---|---|"
+            echo "| Sauvegarde | ${NOM:-?} (${DATE_SAUVEGARDE:-?}) |"
+            echo "| Demandes dans donnees.sql | ${DEMANDES_FICHIER:-?} |"
+            echo "| Demandes restaurées | ${DEMANDES_RESTAUREES:-?} |"
+            echo "| Historique dans donnees.sql / restauré | ${HISTORIQUE_FICHIER:-?} / ${HISTORIQUE_RESTAURE:-?} |"
+            echo "| Notes dans donnees.sql / restaurées | ${NOTES_FICHIER:-?} / ${NOTES_RESTAUREES:-?} |"
+            echo "| Membres dans donnees.sql / restaurés | ${MEMBRES_FICHIER:-?} / ${MEMBRES_RESTAURES:-?} |"
+            echo "| Comptes dans donnees.sql / restaurés | ${COMPTES_FICHIER:-?} / ${COMPTES_RESTAURES:-?} |"
+            echo "| Demandes effacées à nouveau (rejouer_effacements) | ${EFFACEES:-?} |"
+            echo "| Demandes après le rejeu | ${DEMANDES_APRES:-?} |"
+            echo ""
+            echo "| Étape | Durée (s) |"
+            echo "|---|---|"
+            if [ -f "$DUREES" ]; then
+              while IFS='|' read -r etape duree; do echo "| $etape | $duree |"; done < "$DUREES"
+            fi
+            if [ -n "$DEBUT_RESTAURATION" ]; then
+              echo "| **Durée totale** | $(( $(date +%s) - DEBUT_RESTAURATION )) |"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$DEMANDES_RESTAUREES" ] || [ -z "$DEMANDES_APRES" ]; then
+            echo "**Résultat : ÉCHEC, restauration non terminée (voir l'étape en rouge).**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          ecart=""
+          [ -n "$DEMANDES_FICHIER" ] && [ "$DEMANDES_FICHIER" = "$DEMANDES_RESTAUREES" ] || ecart="$ecart demandes ($DEMANDES_FICHIER dans la sauvegarde, $DEMANDES_RESTAUREES restaurées) ;"
+          [ -n "$HISTORIQUE_FICHIER" ] && [ "$HISTORIQUE_FICHIER" = "$HISTORIQUE_RESTAURE" ] || ecart="$ecart historique ($HISTORIQUE_FICHIER / $HISTORIQUE_RESTAURE) ;"
+          [ -n "$NOTES_FICHIER" ] && [ "$NOTES_FICHIER" = "$NOTES_RESTAUREES" ] || ecart="$ecart notes ($NOTES_FICHIER / $NOTES_RESTAUREES) ;"
+          [ -n "$MEMBRES_FICHIER" ] && [ "$MEMBRES_FICHIER" = "$MEMBRES_RESTAURES" ] || ecart="$ecart membres ($MEMBRES_FICHIER / $MEMBRES_RESTAURES) ;"
+          [ -n "$COMPTES_FICHIER" ] && [ "$COMPTES_FICHIER" = "$COMPTES_RESTAURES" ] || ecart="$ecart comptes ($COMPTES_FICHIER / $COMPTES_RESTAURES) ;"
+          if [ -z "$EFFACEES" ] || [ "$DEMANDES_APRES" != "$(( DEMANDES_RESTAUREES - EFFACEES ))" ]; then
+            ecart="$ecart rejeu des effacements ($DEMANDES_RESTAUREES - $EFFACEES ≠ $DEMANDES_APRES) ;"
+          fi
+          if [ -n "$ecart" ]; then
+            echo "**Résultat : ÉCHEC, nombres différents :$ecart**" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Nombres différents :$ecart"
+            exit 1
+          fi
+          echo "**Résultat : réussi, nombres identiques.**" >> "$GITHUB_STEP_SUMMARY"
+          echo "Nombres identiques : $DEMANDES_FICHIER demandes."
+
+      - name: Détruire la base jetable et les fichiers en clair
+        if: always()
+        run: |
+          supabase stop --workdir "$RUNNER_TEMP/base-jetable" --no-backup > /dev/null 2>&1 || true
+          rm -rf "$RUNNER_TEMP/phrase" "$RUNNER_TEMP/sauvegarde.tar.gz" "$RUNNER_TEMP/restauration" \
+            "$RUNNER_TEMP/telechargement" "$RUNNER_TEMP/base-jetable"
+          echo "Base jetable détruite, fichiers en clair supprimés."
