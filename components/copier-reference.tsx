@@ -2,37 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { copierTexte } from "@/lib/copier";
 
 // Bouton « Copier » de la référence (EXPERIENCE.md §6) : affiche « Copié »
 // pendant 2 secondes après la copie, ou « Copie impossible » si le navigateur
 // refuse.
 
 const DUREE_COPIE_MS = 2000;
-
-async function copierTexte(texte: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(texte);
-      return true;
-    }
-  } catch {
-    // Presse-papiers refusé : on tente l'ancienne méthode.
-  }
-  const zone = document.createElement("textarea");
-  try {
-    zone.value = texte;
-    zone.setAttribute("readonly", "");
-    zone.style.position = "fixed";
-    zone.style.opacity = "0";
-    document.body.appendChild(zone);
-    zone.select();
-    return document.execCommand("copy");
-  } catch {
-    return false;
-  } finally {
-    zone.remove();
-  }
-}
 
 export function CopierReference({ reference }: { reference: string }) {
   const [etat, setEtat] = useState<"attente" | "copie" | "echec">("attente");

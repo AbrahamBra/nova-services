@@ -6,6 +6,7 @@ import {
   ResultatsFiltres,
   ZoneFiltres,
 } from "@/components/nova/filtres-demandes";
+import { LienSaisirDemande } from "@/components/nova/lien-saisir";
 import { ListeDemandes } from "@/components/nova/liste-demandes";
 import { Pagination } from "@/components/nova/pagination";
 import { BoutonReessayer } from "@/components/nova/reessayer";
@@ -19,6 +20,8 @@ import {
   parametresListe,
 } from "@/lib/filtres";
 import { formaterNombre } from "@/lib/format";
+// Même message que le tableau de bord vide (story 2.8).
+import { MESSAGE_AUCUNE_DEMANDE } from "@/lib/domaine";
 import { lireOptionsFiltres } from "@/lib/options-filtres";
 
 // Liste des demandes (EXPERIENCE.md §9.4, story 1.5) : toutes les demandes,
@@ -38,9 +41,6 @@ export const metadata: Metadata = {
 
 const CHEMIN = "/equipe/demandes";
 
-const MESSAGE_AUCUNE_DEMANDE =
-  "Aucune demande pour l'instant. Partagez le lien du formulaire à vos clients.";
-
 const MESSAGE_SANS_RESULTAT = "Aucune demande ne correspond à ces filtres.";
 
 const CLASSE_LIEN_EFFACER =
@@ -48,9 +48,6 @@ const CLASSE_LIEN_EFFACER =
 
 // Le total est dans une zone `role="status"` : son changement après un
 // filtre est annoncé par les lecteurs d'écran.
-// Bouton principal de la liste (EXPERIENCE.md §9.4), lien vers la saisie interne.
-const CLASSE_LIEN_SAISIR =
-  "inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-[15px] font-semibold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto";
 
 function Entete({ total }: { total?: number }) {
   return (
@@ -63,9 +60,7 @@ function Entete({ total }: { total?: number }) {
             : null}
         </p>
       </div>
-      <Link href="/equipe/demandes/nouvelle" className={CLASSE_LIEN_SAISIR}>
-        Saisir une demande
-      </Link>
+      <LienSaisirDemande />
     </div>
   );
 }

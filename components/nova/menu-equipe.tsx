@@ -5,12 +5,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MenuIcon, XIcon } from "lucide-react";
 import { deconnexion } from "@/lib/actions/comptes";
+import { lireCompteurDemandes } from "@/lib/actions/demandes";
+import { formaterNombre } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Menu latéral de l'espace équipe (UX-DR3, EXPERIENCE.md §2.2) : bleu marine,
 // 240 px, seulement les rubriques qui existent ; groupe « Administration »
 // pour les administrateurs ; en bas, nom, rôle et « Se déconnecter ».
 // Sous 1 024 px, replié derrière un bouton « Menu ».
+// Story 2.8 : compteur des demandes « À prendre en charge » à côté de
+// « Demandes » et, sous 1 024 px, à côté du bouton « Menu » ; masqué à 0 ou
+// en cas d'erreur. Hors du lien : son nom accessible reste « Demandes ».
+// Valeur initiale lue par la mise en page, puis relue à chaque changement de
+// page (la mise en page n'est pas rendue de nouveau lors d'une navigation) ;
+// une réponse arrivée après une navigation plus récente est ignorée.
 
 type Rubrique = { libelle: string; adresse: string };
 
@@ -26,7 +34,11 @@ type Props = {
   nom: string;
   libelleRole: string;
   estAdmin: boolean;
+  /** Demandes « À prendre en charge » ; `null` si illisible. */
+  aPrendreEnCharge?: number | null;
 };
+
+const CHEMIN_DEMANDES = "/equipe/demandes";
 
 const CLASSE_LIEN =
   "flex min-h-11 items-center rounded-md px-3 text-[15px] font-medium text-sidebar-foreground/85 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-white/70 aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-foreground";
@@ -48,19 +60,80 @@ function estActive(chemin: string, adresse: string): boolean {
   );
 }
 
-function Lien({ rubrique, actif }: { rubrique: Rubrique; actif: boolean }) {
+/**
+ * Compteur des demandes à prendre en charge, ou rien à 0 (ou illisible). Le
+ * chiffre est lu « [n] à prendre en charge » par les lecteurs d'écran.
+ */
+function Compteur({ nombre, className }: { nombre: number | null | undefined; className?: string }) {
+  if (typeof nombre !== "number" || nombre <= 0) return null;
+  const texte = formaterNombre(nombre);
   return (
-    <li>
+    <span
+      data-compteur-menu
+      className={cn(
+        "inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-2 text-[13px] font-semibold text-sidebar",
+        className,
+      )}
+    >
+      <span aria-hidden="true">{texte}</span>
+      <span className="sr-only">{`${texte} à prendre en charge`}</span>
+    </span>
+  );
+}
+
+function Lien({
+  rubrique,
+  actif,
+  compteur,
+}: {
+  rubrique: Rubrique;
+  actif: boolean;
+  compteur?: number | null;
+}) {
+  return (
+    <li className="relative">
       <Link href={rubrique.adresse} aria-current={actif ? "page" : undefined} className={CLASSE_LIEN}>
         {rubrique.libelle}
       </Link>
+      {/* Hors du lien (nom accessible inchangé) ; les clics le traversent. */}
+      <Compteur
+        nombre={compteur}
+        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2"
+      />
     </li>
   );
 }
 
-export function MenuEquipe({ nom, libelleRole, estAdmin }: Props) {
+export function MenuEquipe({ nom, libelleRole, estAdmin, aPrendreEnCharge = null }: Props) {
   const idMenu = useId();
   const chemin = usePathname();
+  const [compteur, setCompteur] = useState(aPrendreEnCharge);
+  const premierChemin = useRef(chemin);
+
+  // Nouvelle valeur de la mise en page (rechargement, `refresh()` après une action).
+  const [compteurInitial, setCompteurInitial] = useState(aPrendreEnCharge);
+  if (aPrendreEnCharge !== compteurInitial) {
+    setCompteurInitial(aPrendreEnCharge);
+    setCompteur(aPrendreEnCharge);
+  }
+
+  // Changement de page : compteur relu (pas au premier rendu, déjà lu par la
+  // mise en page). Une réponse tardive, après une autre navigation, est ignorée.
+  useEffect(() => {
+    if (chemin === premierChemin.current) return;
+    premierChemin.current = "";
+    let actuel = true;
+    lireCompteurDemandes()
+      .then((nombre) => {
+        if (actuel) setCompteur(nombre);
+      })
+      .catch(() => {
+        if (actuel) setCompteur(null);
+      });
+    return () => {
+      actuel = false;
+    };
+  }, [chemin]);
   const [ouvert, setOuvert] = useState(false);
   const [cheminVu, setCheminVu] = useState(chemin);
 
@@ -119,6 +192,7 @@ export function MenuEquipe({ nom, libelleRole, estAdmin }: Props) {
           )}
           Menu
         </button>
+        <Compteur nombre={compteur} />
         <span className="text-[15px] font-semibold">Nova Services</span>
       </header>
 
@@ -141,7 +215,12 @@ export function MenuEquipe({ nom, libelleRole, estAdmin }: Props) {
         <div className="flex-1 px-3 py-3 lg:py-0">
           <ul className="space-y-1">
             {RUBRIQUES.map((rubrique) => (
-              <Lien key={rubrique.adresse} rubrique={rubrique} actif={estActive(chemin, rubrique.adresse)} />
+              <Lien
+                key={rubrique.adresse}
+                rubrique={rubrique}
+                actif={estActive(chemin, rubrique.adresse)}
+                compteur={rubrique.adresse === CHEMIN_DEMANDES ? compteur : undefined}
+              />
             ))}
           </ul>
 

@@ -51,14 +51,16 @@ type Props = {
   parametres?: ParametresAdresse;
   /** Page affichée, transmise au détail. */
   page?: number;
+  /** Nom accessible du tableau (story 2.8 : « Mes demandes en cours »). */
+  libelle?: string;
 };
 
-export function ListeDemandes({ lignes, parametres = {}, page = 1 }: Props) {
+export function ListeDemandes({ lignes, parametres = {}, page = 1, libelle = "Demandes" }: Props) {
   return (
     <>
       {/* Tablette et ordinateur. */}
       <div className="hidden overflow-x-auto rounded-lg border border-border bg-surface sm:block">
-        <table aria-label="Demandes" className="w-full border-collapse text-sm">
+        <table aria-label={libelle} className="w-full border-collapse text-sm">
           <thead>
             <tr>
               <th scope="col" className={CLASSE_ENTETE}>Référence</th>
@@ -120,7 +122,7 @@ export function ListeDemandes({ lignes, parametres = {}, page = 1 }: Props) {
       </div>
 
       {/* Téléphone : une carte par demande. */}
-      <ul className="space-y-3 sm:hidden" aria-label="Demandes">
+      <ul className="space-y-3 sm:hidden" aria-label={libelle}>
         {lignes.map((ligne) => (
           <li
             key={ligne.id}
