@@ -74,6 +74,10 @@ export const MESSAGES_ERREUR = {
   // cet email ne sont plus celles de la recherche (nouvelle demande, ou
   // demande déjà effacée) ; rien n'a été effacé.
   DEMANDES_CHANGEES: "La liste a changé depuis votre recherche. Vérifiez-la avant d'effacer.",
+  // Story 5.5 — demandes expirées (purger_expirees) : leur nombre n'est plus
+  // celui affiché (une demande a expiré ou a été rouverte entre-temps) ;
+  // rien n'a été supprimé.
+  EXPIREES_CHANGEES: "Le nombre de demandes expirées a changé. Vérifiez-le avant de supprimer.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;

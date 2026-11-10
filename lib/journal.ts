@@ -76,6 +76,9 @@ export const CLES_DETAILS_JOURNAL: Record<string, readonly string[]> = {
   // Story 5.4 : le nombre de demandes effacées seulement (jamais l'email, le
   // nom ni les références de la personne).
   demandeur_efface: ["evenement", "nombre"],
+  // Story 5.5 : nombre de demandes expirées supprimées et durée de
+  // conservation appliquée (jamais une référence, un nom ni un email).
+  expirees_supprimees: ["evenement", "nombre", "duree_mois"],
 };
 
 /**
@@ -143,6 +146,7 @@ export const TYPE_EVENEMENT_JOURNAL: Record<string, TypeJournal> = {
   categorie_reactivee: "categorie",
   parametres_modifies: "parametre",
   demandeur_efface: "donnees",
+  expirees_supprimees: "donnees",
 };
 
 const ECHEC = {
@@ -255,6 +259,19 @@ export const PHRASES_JOURNAL: Record<string, (details: Record<string, unknown>) 
     return n === 1
       ? "1 demande effacée (droit à l'effacement)"
       : `${formaterNombre(n)} demandes effacées (droit à l'effacement)`;
+  },
+  // Story 5.5 : « 12 demandes expirées supprimées (traitées depuis plus de 2 ans) ».
+  expirees_supprimees: (d) => {
+    const n = entierPositif(d.nombre);
+    const depuis = duree(d.duree_mois);
+    const nombre =
+      n === null
+        ? "Demandes expirées supprimées"
+        : n === 1
+          ? "1 demande expirée supprimée"
+          : `${formaterNombre(n)} demandes expirées supprimées`;
+    if (depuis === null) return nombre;
+    return `${nombre} (${n === 1 ? "traitée" : "traitées"} depuis plus de ${depuis})`;
   },
   connexion_bloquee: (d) => {
     // Durée affichée seulement si elle est enregistrée.

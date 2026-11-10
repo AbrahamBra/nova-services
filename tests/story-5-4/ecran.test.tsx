@@ -29,6 +29,12 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/actions/donnees", () => ({
   chercherDemandesDemandeur: vi.fn(),
   effacerDemandeur: vi.fn(),
+  purgerExpirees: vi.fn(),
+}));
+
+// Story 5.5 : nombre de demandes expirées lu au chargement de la page.
+vi.mock("@/lib/expirees", () => ({
+  lireExpirees: async () => ({ ok: true, donnees: { nombre: 0, dureeMois: 24 } }),
 }));
 
 vi.mock("next/navigation", async (importer) => ({
