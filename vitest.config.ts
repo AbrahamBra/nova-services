@@ -27,5 +27,10 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
     globalSetup: ["./tests/garde-environnement.ts"],
+    // Beaucoup de tests appellent la vraie base de développement par le
+    // réseau, en parallèle : 5 s par défaut ne suffit pas sur la machine de
+    // GitHub chargée (délais dépassés aléatoires).
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
   },
 });
