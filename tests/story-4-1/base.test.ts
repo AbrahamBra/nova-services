@@ -133,7 +133,10 @@ describe("lister_comptes", () => {
          from public.membres m where m.id = any($1::uuid[])`,
       [ids],
     );
-    expect(ids).toEqual(rows[0].ids);
+    // Base partagée : un autre fichier peut supprimer un de ses comptes de
+    // test entre les deux lectures ; on compare l'ordre des comptes restants.
+    const restants = new Set(rows[0].ids);
+    expect(ids.filter((id) => restants.has(id))).toEqual(rows[0].ids);
   });
 
   it.each([
