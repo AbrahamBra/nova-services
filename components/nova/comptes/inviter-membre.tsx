@@ -92,6 +92,8 @@ export function InviterMembre() {
         ref={boutonRef}
         type="button"
         pleineLargeurTelephone
+        // Story 4.4 : reçoit le focus après l'annulation d'une invitation.
+        data-inviter-membre=""
         onClick={() => {
           setCle((c) => c + 1);
           setOuverte(true);

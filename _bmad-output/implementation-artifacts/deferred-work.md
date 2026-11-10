@@ -130,3 +130,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-3-mot-de-passe-oublie.md`
   summary: Le toast d'erreur de « Générer un lien de mot de passe » (compte désactivé entre-temps, panne) n'est vérifié par aucun test.
   evidence: `BoutonLienMotDePasse` (components/nova/comptes/actions-compte.tsx) ; seuls les codes de refus de l'action sont testés ; à couvrir si un test de toasts est écrit pour ce fichier.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-4-4-renvoyer-annuler-invitation.md`
+  summary: Les toasts d'erreur et les états « en cours » de « Renvoyer l'invitation » et « Annuler l'invitation » ne sont vérifiés par aucun test d'écran.
+  evidence: même convention que les autres actions de comptes (Désactiver, Lien de mot de passe) ; à couvrir ensemble par une étape de test navigateur qui provoque un refus.

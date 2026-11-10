@@ -48,6 +48,9 @@ import { Client } from "pg";
 // Story 4.3 : noter_lien_mot_de_passe pour authenticated (la fonction
 // vérifie l'administrateur actif) ; demandes_reinitialisation et
 // demander_reinitialisation, aucun droit ; rien pour anon.
+// Story 4.4 : noter_renvoi_invitation et annuler_invitation pour
+// authenticated (les fonctions vérifient l'administrateur actif) ; rien pour
+// anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -63,6 +66,7 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.activer_mon_compte():EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
+  "authenticated:fonction:public.annuler_invitation(p_id uuid):EXECUTE",
   "authenticated:fonction:public.attribuer(p_demande_id uuid, p_membre_id uuid):EXECUTE",
   "authenticated:fonction:public.changer_categorie(p_demande_id uuid, p_categorie_id uuid):EXECUTE",
   "authenticated:fonction:public.changer_priorite(p_demande_id uuid, p_priorite text):EXECUTE",
@@ -75,6 +79,7 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.mon_invitation():EXECUTE",
   "authenticated:fonction:public.mon_profil():EXECUTE",
   "authenticated:fonction:public.noter_lien_mot_de_passe(p_id uuid):EXECUTE",
+  "authenticated:fonction:public.noter_renvoi_invitation(p_id uuid):EXECUTE",
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
   "authenticated:fonction:public.liberer(p_demande_id uuid):EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
