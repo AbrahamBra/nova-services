@@ -51,6 +51,9 @@ import { Client } from "pg";
 // Story 4.4 : noter_renvoi_invitation et annuler_invitation pour
 // authenticated (les fonctions vérifient l'administrateur actif) ; rien pour
 // anon.
+// Story 5.1 : lire_journal pour authenticated (la fonction vérifie
+// l'administrateur actif) ; le journal lui-même reste sans aucun droit ; rien
+// pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -82,6 +85,7 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.noter_renvoi_invitation(p_id uuid):EXECUTE",
   "authenticated:fonction:public.ids_demandes_recherche(p_texte text):EXECUTE",
   "authenticated:fonction:public.liberer(p_demande_id uuid):EXECUTE",
+  "authenticated:fonction:public.lire_journal(p_type text, p_page integer):EXECUTE",
   "authenticated:fonction:public.prendre_en_charge(p_demande_id uuid):EXECUTE",
   "authenticated:fonction:public.rechercher_demandes(p_texte text):EXECUTE",
   "authenticated:fonction:public.saisir_demande(p_cle_envoi uuid, p_canal text, p_nom text, p_email text, p_telephone text, p_societe text, p_categorie_id uuid, p_objet text, p_description text):EXECUTE",

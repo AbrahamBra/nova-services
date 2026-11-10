@@ -183,6 +183,15 @@ describe("sécurité — droits de service_role sur les tables", () => {
     });
   });
 
+  // Story 5.1 : le journal se lit avec la session de l'administrateur,
+  // jamais avec la clé secrète.
+  it("aucun droit sur lire_journal", async () => {
+    const { rows } = await client.query<{ peut: boolean }>(
+      "select has_function_privilege('service_role', 'public.lire_journal(text, integer)', 'EXECUTE') as peut",
+    );
+    expect(rows[0].peut).toBe(false);
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",
