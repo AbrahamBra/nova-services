@@ -32,10 +32,12 @@ const RUBRIQUES: Rubrique[] = [
 // Story 5.1 : « Journal » après « Comptes ».
 // Story 5.2 : « Catégories » entre « Comptes » et « Journal ».
 // Story 5.3 : « Paramètres » entre « Catégories » et « Journal ».
+// Story 5.4 : « Données » entre « Paramètres » et « Journal ».
 const RUBRIQUES_ADMIN: Rubrique[] = [
   { libelle: "Comptes", adresse: "/equipe/admin/comptes" },
   { libelle: "Catégories", adresse: "/equipe/admin/categories" },
   { libelle: "Paramètres", adresse: "/equipe/admin/parametres" },
+  { libelle: "Données", adresse: "/equipe/admin/donnees" },
   { libelle: "Journal", adresse: "/equipe/admin/journal" },
 ];
 

@@ -231,6 +231,22 @@ describe("sécurité — droits de service_role sur les tables", () => {
     });
   });
 
+  // Story 5.4 : le droit à l'effacement s'exerce avec la session de
+  // l'administrateur, jamais avec la clé secrète (seul rejouer_effacements
+  // reste à service_role).
+  it("aucun droit sur les fonctions du droit à l'effacement", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.chercher_demandes_demandeur(text)',
+                         'public.effacer_demandeur(text, uuid[])']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.chercher_demandes_demandeur(text)": false,
+      "public.effacer_demandeur(text, uuid[])": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",
