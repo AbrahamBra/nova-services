@@ -148,3 +148,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-5-4-effacer-donnees-personne.md`
   summary: Les messages d'erreur de l'écran d'effacement (refus, erreur imprévue) ne sont vérifiés par aucun test d'écran.
   evidence: même convention que les autres écrans d'administration ; à couvrir par un test navigateur qui provoque un refus.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-5-supprimer-demandes-expirees.md`
+  summary: Une première purge après des années de données pourrait dépasser le délai maximal d'une requête et être annulée.
+  evidence: non vérifié (medium s'il arrive) ; `purger_expirees` supprime tout en une instruction ; à mesurer sur la production, puis découper par lots ou fixer `statement_timeout` sur la fonction si besoin.

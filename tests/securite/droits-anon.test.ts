@@ -63,6 +63,8 @@ import { Client } from "pg";
 // Story 5.4 : chercher_demandes_demandeur et effacer_demandeur pour
 // authenticated (les fonctions vérifient l'administrateur actif) ; rien pour
 // anon.
+// Story 5.5 : compter_expirees et purger_expirees pour authenticated (les
+// fonctions vérifient l'administrateur actif) ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -86,6 +88,8 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.modifier_parametres(p_nom_affiche text, p_email_contact text, p_duree_mois integer):EXECUTE",
   "authenticated:fonction:public.chercher_demandes_demandeur(p_email text):EXECUTE",
   "authenticated:fonction:public.effacer_demandeur(p_email text, p_ids uuid[]):EXECUTE",
+  "authenticated:fonction:public.compter_expirees():EXECUTE",
+  "authenticated:fonction:public.purger_expirees(p_nombre_attendu integer):EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
   "authenticated:fonction:public.annuler_invitation(p_id uuid):EXECUTE",
   "authenticated:fonction:public.attribuer(p_demande_id uuid, p_membre_id uuid):EXECUTE",

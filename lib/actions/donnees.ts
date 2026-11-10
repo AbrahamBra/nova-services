@@ -2,22 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import { messageErreur, type CodeErreur } from "@/lib/erreurs";
+import { lireExpireesAvec } from "@/lib/expirees";
 import {
   MESSAGES_DONNEES,
   lireReponseDemandesDemandeur,
   schemaIdsDemandes,
+  schemaNombreExpirees,
   verifierEmailDemandeur,
   type DemandeDemandeur,
+  type Expirees,
 } from "@/lib/schemas/donnees";
 import { appeler, signaler, type ResultatAction } from "@/lib/server/appeler";
 import { lireProfil } from "@/lib/session";
 import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur de la page Données personnelles (story 5.4, droit à
-// l'effacement). L'email recherché arrive par ces actions, jamais par
-// l'adresse de la page ; il n'est écrit ni dans la console, ni dans Sentry,
-// ni dans le journal (AD-14) : seuls le nom de l'action ou de la fonction
-// SQL et un code y figurent. Le rôle d'administrateur est revérifié par
+// l'effacement ; story 5.5, demandes expirées). L'email recherché arrive par
+// ces actions, jamais par l'adresse de la page ; il n'est écrit ni dans la
+// console, ni dans Sentry, ni dans le journal (AD-14) : seuls le nom de
+// l'action ou de la fonction SQL et un code y figurent. Le rôle d'administrateur est revérifié par
 // chaque action (jamais seulement par l'écran), puis par la base.
 
 // Tout l'espace équipe : liste, recherche et détail des demandes, accueil,
@@ -130,4 +133,51 @@ export async function effacerDemandeur(
     return refus("ERREUR_INATTENDUE");
   }
   return { ok: true, donnees: { nombre } };
+}
+
+/**
+ * Résultat de « Supprimer les demandes expirées » : quand leur nombre a
+ * changé (EXPIREES_CHANGEES), le nouveau nombre relu, à afficher.
+ */
+export type ResultatPurge =
+  | { ok: true; donnees: { nombre: number } }
+  | { ok: false; code: CodeErreur; message: string; expirees?: Expirees };
+
+/**
+ * Supprime les demandes expirées (story 5.5) : profil administrateur
+ * revérifié → Zod (nombre affiché à l'écran) → `purger_expirees` avec la
+ * session (rien n'est supprimé si leur nombre a changé : EXPIREES_CHANGEES,
+ * avec le nouveau nombre relu par `compter_expirees`). Dès que la base a
+ * supprimé, toutes les pages de l'espace équipe sont rafraîchies.
+ */
+export async function purgerExpirees(nombreAffiche: unknown): Promise<ResultatPurge> {
+  const admin = await verifierAdmin();
+  if (!admin.ok) return refus(admin.code);
+
+  const nombre = schemaNombreExpirees.safeParse(nombreAffiche);
+  if (!nombre.success) return refus("DONNEES_INVALIDES");
+
+  const client = await clientSession("purgerExpirees");
+  if (!client) return refus("ERREUR_INATTENDUE");
+
+  const resultat = await appeler<unknown>(client, "purger_expirees", {
+    p_nombre_attendu: nombre.data,
+  });
+  if (!resultat.ok) {
+    if (resultat.code === "EXPIREES_CHANGEES") {
+      const relu = await lireExpireesAvec(client);
+      return relu.ok ? { ...refus("EXPIREES_CHANGEES"), expirees: relu.donnees } : refus("EXPIREES_CHANGEES");
+    }
+    return refusBase(resultat.code);
+  }
+
+  const supprimees = (resultat.donnees as { nombre?: unknown } | null)?.nombre;
+  // La base a répondu sans erreur : la suppression est faite, même si la
+  // réponse est illisible.
+  revalidatePath(CHEMIN_EQUIPE, "layout");
+  if (typeof supprimees !== "number" || !Number.isInteger(supprimees) || supprimees < 0) {
+    signaler("[purgerExpirees] réponse inattendue de purger_expirees");
+    return refus("ERREUR_INATTENDUE");
+  }
+  return { ok: true, donnees: { nombre: supprimees } };
 }

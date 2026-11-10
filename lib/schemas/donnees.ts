@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { STATUTS, type Statut } from "@/lib/domaine";
-import { formaterNombre } from "@/lib/format";
+import { formaterDuree, formaterNombre } from "@/lib/format";
 
 // Schéma et textes du bloc « Droit à l'effacement » de la page Données
 // personnelles (story 5.4, AD-8) : utilisés à l'écran
@@ -108,4 +108,56 @@ export function lireReponseDemandesDemandeur(valeur: unknown): DemandeDemandeur[
     demandes.push({ id, reference, creeLe: cree_le, objet, statut: statut as Statut });
   }
   return demandes;
+}
+
+// Bloc « Demandes expirées » (story 5.5) --------------------------------------
+// Demandes Traitées depuis plus que la durée de conservation réglée
+// (`compter_expirees`, `purger_expirees`, migration 0034).
+
+/** État du bloc : nombre de demandes expirées et durée de conservation réglée. */
+export type Expirees = { nombre: number; dureeMois: number };
+
+/** Plus grand entier SQL (`integer`) : au-delà, la base refuserait l'appel. */
+export const NOMBRE_EXPIREES_MAX = 2147483647;
+
+/** Nombre annoncé à l'écran et envoyé à la purge : au moins une demande, un entier SQL. */
+export const schemaNombreExpirees = z.number().int().min(1).max(NOMBRE_EXPIREES_MAX);
+
+/** « 12 demandes sont traitées depuis plus de 2 ans. » ; « Aucune demande expirée. » à 0. */
+export function texteExpirees({ nombre, dureeMois }: Expirees): string {
+  if (nombre === 0) return "Aucune demande expirée.";
+  const duree = formaterDuree(dureeMois);
+  return nombre === 1
+    ? `1 demande est traitée depuis plus de ${duree}.`
+    : `${formaterNombre(nombre)} demandes sont traitées depuis plus de ${duree}.`;
+}
+
+/** Texte de la fenêtre de confirmation de la purge. */
+export function texteConfirmationPurge({ nombre, dureeMois }: Expirees): string {
+  const duree = formaterDuree(dureeMois);
+  return nombre === 1
+    ? `1 demande traitée depuis plus de ${duree} va être supprimée définitivement, avec son historique et ses notes. Cette action ne peut pas être annulée.`
+    : `${formaterNombre(nombre)} demandes traitées depuis plus de ${duree} vont être supprimées définitivement, avec leur historique et leurs notes. Cette action ne peut pas être annulée.`;
+}
+
+/** Toast après la purge : « 12 demandes supprimées. ». */
+export function texteDemandesSupprimees(nombre: number): string {
+  return nombre === 1 ? "1 demande supprimée." : `${formaterNombre(nombre)} demandes supprimées.`;
+}
+
+/** Valide la réponse de `compter_expirees()` ; null si elle n'a pas la forme attendue. */
+export function lireReponseExpirees(valeur: unknown): Expirees | null {
+  if (!estObjet(valeur)) return null;
+  const { nombre, duree_mois } = valeur;
+  if (
+    typeof nombre !== "number" ||
+    !Number.isInteger(nombre) ||
+    nombre < 0 ||
+    typeof duree_mois !== "number" ||
+    !Number.isInteger(duree_mois) ||
+    duree_mois <= 0
+  ) {
+    return null;
+  }
+  return { nombre, dureeMois: duree_mois };
 }

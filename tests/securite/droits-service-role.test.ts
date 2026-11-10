@@ -247,6 +247,21 @@ describe("sécurité — droits de service_role sur les tables", () => {
     });
   });
 
+  // Story 5.5 : la suppression des demandes expirées s'exerce avec la session
+  // de l'administrateur, jamais avec la clé secrète.
+  it("aucun droit sur les fonctions des demandes expirées", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.compter_expirees()',
+                         'public.purger_expirees(integer)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.compter_expirees()": false,
+      "public.purger_expirees(integer)": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",
