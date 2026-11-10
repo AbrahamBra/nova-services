@@ -8,7 +8,16 @@
 // Sans dépendance au serveur : utilisable par les pages, la barre de filtres
 // (navigateur) et les tests.
 
-import { CANAUX, PRIORITES, STATUTS, type Canal, type Priorite, type Statut } from "@/lib/domaine";
+import {
+  CANAUX,
+  PRIORITES,
+  STATUTS,
+  TYPES_JOURNAL,
+  type Canal,
+  type Priorite,
+  type Statut,
+  type TypeJournal,
+} from "@/lib/domaine";
 
 export const TAILLE_PAGE = 25;
 
@@ -268,3 +277,41 @@ export function conditionsDesFiltres(filtres: Filtres, membreId: string | null):
 
 /** Choix d'une liste « Catégorie » ou « Responsable » de la barre de filtres. */
 export type OptionFiltre = { id: string; nom: string; desactive: boolean };
+
+// Journal (story 5.1) ----------------------------------------------------------
+// Filtre par type et page dans l'adresse (`?type=compte&page=2`), 50 lignes
+// par page. Un type inconnu est ignoré ; la page redirige alors vers la forme
+// canonique, comme la liste des demandes.
+
+export const TAILLE_PAGE_JOURNAL = 50;
+
+/** Lit `?type=` : un des types du journal, sinon undefined (« Tous »). */
+export function lireTypeJournal(valeur: ValeurParametre): TypeJournal | undefined {
+  return parmi(TYPES_JOURNAL, valeur);
+}
+
+/** Paramètres canoniques du journal : `type` s'il y en a un, puis `page` au-delà de 1. */
+export function parametresJournal(type: TypeJournal | undefined, page: number = 1): Record<string, string> {
+  const parametres: Record<string, string> = {};
+  if (type) parametres.type = type;
+  if (page > 1) parametres.page = String(Math.trunc(page));
+  return parametres;
+}
+
+/** Adresse du journal avec ce type et cette page (page 1 sans `page`). */
+export function adresseJournal(chemin: string, type: TypeJournal | undefined, page: number = 1): string {
+  const texte = new URLSearchParams(parametresJournal(type, page)).toString();
+  return texte ? `${chemin}?${texte}` : chemin;
+}
+
+/** Vrai si les paramètres reçus sont exactement la forme canonique du journal. */
+export function estAdresseJournalCanonique(
+  parametres: ParametresAdresse,
+  type: TypeJournal | undefined,
+  page: number,
+): boolean {
+  const attendus = parametresJournal(type, page);
+  const recus = Object.entries(parametres).filter(([, valeur]) => valeur !== undefined);
+  if (recus.length !== Object.keys(attendus).length) return false;
+  return recus.every(([cle, valeur]) => typeof valeur === "string" && attendus[cle] === valeur);
+}

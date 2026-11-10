@@ -38,7 +38,7 @@ function echec(code: CodeErreur): { ok: false; code: CodeErreur; message: string
 }
 
 /** Trace une erreur imprévue dans la console et dans Sentry (sans effet sans DSN). */
-function signaler(message: string): void {
+export function signaler(message: string): void {
   console.error(message);
   try {
     Sentry.captureMessage(message, "error");

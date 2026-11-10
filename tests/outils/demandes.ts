@@ -24,6 +24,8 @@ export type OptionsDemande = {
   nomDemandeur?: string;
   /** Email du demandeur (story 2.5). */
   email?: string;
+  /** Téléphone du demandeur (story 5.1) ; aucun par défaut. */
+  telephone?: string;
   /** Canal (story 2.5) ; « formulaire » par défaut. */
   canal?: Canal;
   /** Catégorie, même désactivée (story 2.5) ; la première catégorie active par défaut. */
@@ -57,11 +59,12 @@ export async function creerDemandeTest(
   const objet = options.objet ?? `Demande de test ${randomUUID().slice(0, 6)}`;
   const societe = options.societe === undefined ? "Atelier Garnier" : options.societe;
   const { rows } = await base.query<{ r: { reference: string } }>(
-    "select public.deposer_demande($1, $2, $3, null, $4, $5, $6, $7, true, $8) as r",
+    "select public.deposer_demande($1, $2, $3, $4, $5, $6, $7, $8, true, $9) as r",
     [
       randomUUID(),
       nom,
       options.email ?? "sophie.garnier@example.com",
+      options.telephone ?? null,
       societe,
       categorie.id,
       objet,
