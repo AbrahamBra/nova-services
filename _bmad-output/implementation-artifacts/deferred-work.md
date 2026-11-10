@@ -71,7 +71,7 @@
   evidence: Le test actuel ne lit que le texte du fichier ; un `||` changé en `&&` passerait. À faire avec l'ajout de `purger_technique`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-2-sauvegarder-chaque-nuit.md`
   summary: Vérifier que `donnees.sql` contient bien les comptes (`auth.users`) — non vérifié.
-  evidence: Si absents, les membres restaurés n'auraient pas de compte ; à prouver pendant la restauration réelle (story 3.4).
+  evidence: Si absents, les membres restaurés n'auraient pas de compte ; à prouver pendant la restauration réelle (story 3.4). TRAITÉ le 10/11/2026 : 1 compte dans la sauvegarde, 1 restauré.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-3-suivre-les-erreurs.md`
   summary: Vérifier en production (Netlify) que les erreurs arrivent dans Sentry sans perte (flush des fonctions) et en un seul exemplaire.
@@ -119,7 +119,7 @@
   evidence: non vérifié (medium s'il est réel) ; `prendre_en_charge` ne verrouille pas la ligne `membres` ; à corriger par un `for share` sur le membre dans `prendre_en_charge`.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md` (écriture dans `effacements` TRAITÉE en story 5.4 ; essai de restauration à refaire)
-  summary: Faire écrire `effacer_demandeur` (epic 5) dans `effacements`, avec un test, puis refaire l'essai de restauration après la story 5.4 en vérifiant un vrai rejeu.
+  summary: Faire écrire `effacer_demandeur` (epic 5) dans `effacements`, avec un test, puis refaire l'essai de restauration après la story 5.4 en vérifiant un vrai rejeu. RE-TEST TRAITÉ le 10/11/2026 (essai n° 2 de docs/exploitation/restauration.md).
   evidence: Le registre n'est rempli par rien aujourd'hui ; seul un commentaire de la migration le rappelle.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
   summary: Sortir le comptage des lignes et la comparaison de « Restauration de test » dans un script testé par Vitest avec un `donnees.sql` d'exemple.

@@ -2,7 +2,7 @@
 title: 'Story 3.4 — Restaurer une sauvegarde (essai réel)'
 type: 'feature'
 created: '2026-11-06'
-status: 'in-review'
+status: 'done'
 baseline_commit: '52b4d074ed8952f3fc99b62c6bd8385c47840909'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -72,6 +72,8 @@ context:
 - Given la restauration, when la tâche se termine, then `rejouer_effacements()` a été appelée et son résultat figure dans le rapport.
 
 ## Implementation Notes
+
+- 10/11/2026 : essais réels réussis (restauration : 5/5 demandes ; rejeu : 1 demande effacée à nouveau avec le registre d'une sauvegarde plus récente, option `registre` ajoutée à la tâche). Voir `docs/exploitation/restauration.md`.
 
 ## Spec Change Log
 
