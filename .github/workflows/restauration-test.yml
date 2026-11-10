@@ -23,6 +23,10 @@ on:
         description: "Numéro d'exécution de « Sauvegarde nocturne » à restaurer (vide : la plus récente)"
         required: false
         default: ""
+      registre:
+        description: "Numéro d'exécution d'une Sauvegarde nocturne PLUS RÉCENTE dont on réinjecte le registre des effacements (vide : registre de la sauvegarde restaurée seulement)"
+        required: false
+        default: ""
 
 permissions:
   actions: read
@@ -45,6 +49,7 @@ jobs:
       SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
       GH_TOKEN: ${{ github.token }}
       EXECUTION: ${{ inputs.execution }}
+      REGISTRE: ${{ inputs.registre }}
     steps:
       - name: Vérifier la phrase de chiffrement
         run: |
@@ -183,6 +188,96 @@ jobs:
           echo "membres=$(compter public membres)" >> "$GITHUB_OUTPUT"
           echo "comptes=$(compter auth users)" >> "$GITHUB_OUTPUT"
 
+      # Facultatif : registre des effacements d'une sauvegarde PLUS RÉCENTE,
+      # réinjecté avant le rejeu (même principe que la vraie restauration :
+      # les effacements faits après la sauvegarde restaurée ne sont pas dans
+      # son registre). Seul le bloc COPY de public.effacements est gardé.
+      - name: Récupérer le registre d'une sauvegarde plus récente
+        id: registre
+        if: inputs.registre != ''
+        env:
+          DATE_SAUVEGARDE: ${{ steps.sauvegarde.outputs.date }}
+        run: |
+          debut=$(date +%s)
+          umask 077
+          telechargement="$RUNNER_TEMP/registre-telechargement"
+          extraction="$RUNNER_TEMP/registre-extraction"
+          registre="$RUNNER_TEMP/registre"
+          phrase="$RUNNER_TEMP/phrase"
+          # Fichiers en clair supprimés même en cas d'échec (le registre
+          # extrait est gardé seulement si tout a réussi).
+          nettoyer() { rm -rf "$telechargement" "$extraction" "$phrase" "$RUNNER_TEMP/registre.tar.gz"; }
+          trap nettoyer EXIT
+          if [[ ! "$REGISTRE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Numéro d'exécution du registre invalide : chiffres seulement. Rien n'a été restauré."
+            exit 1
+          fi
+          chemin=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REGISTRE" --jq '.path + " " + (.conclusion // "")' 2>/dev/null) || chemin=""
+          if [ "$chemin" != ".github/workflows/sauvegarde-nocturne.yml success" ]; then
+            echo "::error::L'exécution $REGISTRE (registre) n'est pas une « Sauvegarde nocturne » réussie. Rien n'a été restauré."
+            exit 1
+          fi
+          trouve=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REGISTRE/artifacts" \
+            --jq '[.artifacts[] | select(.expired == false) | select(.name | startswith("sauvegarde-production-"))][0] // empty | .name + " " + .created_at')
+          if [ -z "$trouve" ]; then
+            echo "::error::Aucune sauvegarde de production disponible dans l'exécution $REGISTRE (registre). Rien n'a été restauré."
+            exit 1
+          fi
+          read -r nom date_registre <<< "$trouve"
+          if [[ ! "$nom" =~ ^sauvegarde-production-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+-[0-9]+$ ]]; then
+            echo "::error::Nom de fichier de sauvegarde inattendu (registre)."
+            exit 1
+          fi
+          # Dates ISO 8601 en UTC (même format) : comparables comme du texte.
+          if [[ ! "$date_registre" > "$DATE_SAUVEGARDE" ]]; then
+            echo "::error::La sauvegarde du registre ($date_registre) n'est pas plus récente que la sauvegarde restaurée ($DATE_SAUVEGARDE). Rien n'a été restauré."
+            exit 1
+          fi
+          mkdir -p "$telechargement" "$extraction"
+          gh run download "$REGISTRE" --repo "$GITHUB_REPOSITORY" --name "$nom" --dir "$telechargement"
+          chiffre="$telechargement/sauvegarde.tar.gz.gpg"
+          if [ ! -s "$chiffre" ]; then
+            echo "::error::Fichier sauvegarde.tar.gz.gpg absent ou vide dans $nom (registre)."
+            exit 1
+          fi
+          printf '%s' "$SAUVEGARDE_PHRASE" > "$phrase"
+          gpgconf --kill gpg-agent || true
+          if ! gpg --batch --yes --no-symkey-cache --pinentry-mode loopback \
+              --passphrase-file "$phrase" --decrypt -o "$RUNNER_TEMP/registre.tar.gz" "$chiffre" 2>/dev/null; then
+            echo "::error::Déchiffrement impossible (registre) : phrase fausse ou fichier abîmé. Rien n'a été restauré."
+            exit 1
+          fi
+          rm -f "$phrase"
+          tar -C "$extraction" -xzf "$RUNNER_TEMP/registre.tar.gz" donnees.sql
+          rm -f "$RUNNER_TEMP/registre.tar.gz"
+          mkdir -p "$registre"
+          # Bloc COPY de public.effacements (en-tête avec ou sans guillemets) :
+          # colonnes dans colonnes.txt, lignes dans lignes.copy. Rien n'est affiché.
+          awk -v sortie="$registre" '
+            BEGIN { entete1 = "COPY public.effacements "; entete2 = "COPY \"public\".\"effacements\" " }
+            dans && $0 == "\\." { dans = 0; next }
+            dans { print > (sortie "/lignes.copy"); next }
+            index($0, entete1) == 1 || index($0, entete2) == 1 {
+              dans = 1; trouve = 1
+              colonnes = $0; sub(/^[^(]*\(/, "", colonnes); sub(/\) FROM stdin;$/, "", colonnes)
+              print colonnes > (sortie "/colonnes.txt")
+            }
+            END { if (!trouve) exit 3 }
+          ' "$extraction/donnees.sql" || {
+            echo "::error::Aucun registre des effacements dans la sauvegarde $REGISTRE (migration 0027 absente à cette date ?)."
+            exit 1
+          }
+          touch "$registre/lignes.copy"
+          if [[ ! "$(cat "$registre/colonnes.txt")" =~ ^[a-z_\",\ ]+$ ]]; then
+            echo "::error::Colonnes inattendues dans le registre de la sauvegarde $REGISTRE."
+            exit 1
+          fi
+          lignes=$(wc -l < "$registre/lignes.copy" | tr -d ' ')
+          echo "execution=$REGISTRE" >> "$GITHUB_OUTPUT"
+          echo "lignes=$lignes" >> "$GITHUB_OUTPUT"
+          echo "Registre de la sauvegarde $REGISTRE extrait : $lignes référence(s)."
+          echo "Récupérer le registre plus récent|$(( $(date +%s) - debut ))" >> "$DUREES"
+
       - uses: supabase/setup-cli@v1
         with:
           # Même version que package.json (supabase ~3.0.0).
@@ -274,6 +369,30 @@ jobs:
             echo "::error::Fonction rejouer_effacements absente : la migration 0027 n'était pas appliquée en production au moment de cette sauvegarde."
             exit 1
           fi
+          # Registre plus récent : chargé dans une table temporaire, puis ajouté
+          # au registre restauré sans doublon, AVANT le rejeu (une seule
+          # session psql : la table temporaire vit jusqu'à la fin de l'appel).
+          registre="$RUNNER_TEMP/registre"
+          if [ -n "$REGISTRE" ]; then
+            if [ ! -f "$registre/colonnes.txt" ]; then
+              echo "::error::Registre plus récent demandé mais non récupéré."
+              exit 1
+            fi
+            colonnes=$(cat "$registre/colonnes.txt")
+            resultat=$(psql --quiet --no-psqlrc --tuples-only --no-align \
+                --variable ON_ERROR_STOP=1 --variable VERBOSITY=sqlstate \
+                --dbname "$BASE_JETABLE" \
+                --command "create temp table registre_recent (like public.effacements)" \
+                --command "\copy registre_recent ($colonnes) from pstdin" \
+                --command "select count(*) from registre_recent r join public.demandes d on d.reference = r.reference" \
+                --command "insert into public.effacements select * from registre_recent on conflict (reference) do nothing" \
+                < "$registre/lignes.copy") \
+              || { echo "::error::Réinjection du registre plus récent impossible."; exit 1; }
+            presentes=$(printf '%s\n' "$resultat" | grep -E '^[0-9]+$' | head -1)
+            echo "presentes=${presentes:-0}" >> "$GITHUB_OUTPUT"
+            rm -rf "$registre"
+            echo "Registre plus récent réinjecté."
+          fi
           effacees=$(requete 'select public.rejouer_effacements()')             || { echo "::error::Échec de rejouer_effacements()."; exit 1; }
           echo "effacees=$effacees" >> "$GITHUB_OUTPUT"
           compter_table public.demandes apres
@@ -297,6 +416,9 @@ jobs:
           COMPTES_RESTAURES: ${{ steps.base.outputs.comptes }}
           EFFACEES: ${{ steps.base.outputs.effacees }}
           DEMANDES_APRES: ${{ steps.base.outputs.apres }}
+          REGISTRE_EXECUTION: ${{ steps.registre.outputs.execution }}
+          REGISTRE_LIGNES: ${{ steps.registre.outputs.lignes }}
+          REGISTRE_PRESENTES: ${{ steps.base.outputs.presentes }}
         run: |
           {
             echo "## Restauration de test"
@@ -312,6 +434,9 @@ jobs:
             echo "| Notes dans donnees.sql / restaurées | ${NOTES_FICHIER:-?} / ${NOTES_RESTAUREES:-?} |"
             echo "| Membres dans donnees.sql / restaurés | ${MEMBRES_FICHIER:-?} / ${MEMBRES_RESTAURES:-?} |"
             echo "| Comptes dans donnees.sql / restaurés | ${COMPTES_FICHIER:-?} / ${COMPTES_RESTAURES:-?} |"
+            if [ -n "$REGISTRE" ]; then
+              echo "| Références réinjectées depuis la sauvegarde n° ${REGISTRE_EXECUTION:-$REGISTRE} | ${REGISTRE_LIGNES:-?} (dont présentes dans la base restaurée : ${REGISTRE_PRESENTES:-?}) |"
+            fi
             echo "| Demandes effacées à nouveau (rejouer_effacements) | ${EFFACEES:-?} |"
             echo "| Demandes après le rejeu | ${DEMANDES_APRES:-?} |"
             echo ""
@@ -339,6 +464,15 @@ jobs:
           if [ -z "$EFFACEES" ] || [ "$DEMANDES_APRES" != "$(( DEMANDES_RESTAUREES - EFFACEES ))" ]; then
             ecart="$ecart rejeu des effacements ($DEMANDES_RESTAUREES - $EFFACEES ≠ $DEMANDES_APRES) ;"
           fi
+          # Registre plus récent : s'il cite des demandes de la base restaurée,
+          # le rejeu doit en avoir effacé au moins une.
+          if [ -n "$REGISTRE" ]; then
+            if [ -z "$REGISTRE_PRESENTES" ]; then
+              ecart="$ecart registre plus récent non réinjecté ;"
+            elif [ "$REGISTRE_PRESENTES" -ge 1 ] && [ "${EFFACEES:-0}" -lt 1 ]; then
+              ecart="$ecart rejeu du registre plus récent ($REGISTRE_PRESENTES référence(s) présente(s), 0 effacée) ;"
+            fi
+          fi
           if [ -n "$ecart" ]; then
             echo "**Résultat : ÉCHEC, nombres différents :$ecart**" >> "$GITHUB_STEP_SUMMARY"
             echo "::error::Nombres différents :$ecart"
@@ -352,5 +486,7 @@ jobs:
         run: |
           supabase stop --workdir "$RUNNER_TEMP/base-jetable" --no-backup > /dev/null 2>&1 || true
           rm -rf "$RUNNER_TEMP/phrase" "$RUNNER_TEMP/sauvegarde.tar.gz" "$RUNNER_TEMP/restauration" \
-            "$RUNNER_TEMP/telechargement" "$RUNNER_TEMP/base-jetable"
+            "$RUNNER_TEMP/telechargement" "$RUNNER_TEMP/base-jetable" \
+            "$RUNNER_TEMP/registre" "$RUNNER_TEMP/registre-telechargement" \
+            "$RUNNER_TEMP/registre-extraction" "$RUNNER_TEMP/registre.tar.gz"
           echo "Base jetable détruite, fichiers en clair supprimés."

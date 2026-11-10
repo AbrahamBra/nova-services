@@ -168,6 +168,64 @@ describe("tâche « Restauration de test »", () => {
     expect(code).toContain("n'est pas une « Sauvegarde nocturne » réussie.");
   });
 
+  describe("registre d'une sauvegarde plus récente (entrée « registre »)", () => {
+    const etape = code.slice(
+      position("name: Récupérer le registre d'une sauvegarde plus récente"),
+      position("uses: supabase/setup-cli@v1"),
+    );
+
+    it("entrée facultative, passée par une variable, étape sautée si vide", () => {
+      expect(code).toMatch(/^ {6}registre:\n {8}description: "Numéro d'exécution d'une Sauvegarde nocturne PLUS RÉCENTE/m);
+      expect(code).toContain("REGISTRE: ${{ inputs.registre }}");
+      expect(etape).toContain("if: inputs.registre != ''");
+      expect(code).not.toMatch(/run: \|[^]*\$\{\{ inputs\.registre \}\}/);
+    });
+
+    it("valide le numéro, une « Sauvegarde nocturne » réussie, et une date plus récente", () => {
+      expect(etape).toContain('[[ ! "$REGISTRE" =~ ^[0-9]+$ ]]');
+      expect(etape).toContain('".github/workflows/sauvegarde-nocturne.yml success"');
+      expect(etape).toContain("n'est pas une « Sauvegarde nocturne » réussie");
+      expect(etape).toContain('[[ ! "$date_registre" > "$DATE_SAUVEGARDE" ]]');
+      expect(etape).toContain("n'est pas plus récente que la sauvegarde restaurée");
+      // Toutes les vérifications avant le téléchargement.
+      expect(etape.indexOf("plus récente que")).toBeLessThan(etape.indexOf("gh run download"));
+    });
+
+    it("déchiffre avec la phrase par fichier et ne garde que le bloc COPY de public.effacements", () => {
+      expect(etape).toContain("printf '%s' \"$SAUVEGARDE_PHRASE\" > \"$phrase\"");
+      expect(etape).toContain('--passphrase-file "$phrase"');
+      expect(etape).toContain("--no-symkey-cache");
+      expect(etape).toMatch(/tar -C "\$extraction" -xzf "\$RUNNER_TEMP\/registre\.tar\.gz" donnees\.sql/);
+      expect(etape).toContain('entete1 = "COPY public.effacements "');
+      expect(etape).toContain(String.raw`entete2 = "COPY \"public\".\"effacements\" "`);
+      expect(etape).toContain("[a-z_");
+    });
+
+    it("supprime les fichiers en clair même en cas d'échec", () => {
+      expect(etape).toContain("trap nettoyer EXIT");
+      expect(etape).toMatch(/nettoyer\(\) \{ rm -rf "\$telechargement" "\$extraction" "\$phrase"/);
+      expect(code).toMatch(/Détruire la base jetable[^]*"\$RUNNER_TEMP\/registre"[^]*"\$RUNNER_TEMP\/registre-extraction"/);
+    });
+
+    it("réinjecte le registre sans doublon, AVANT le rejeu", () => {
+      expect(code).toContain("create temp table registre_recent (like public.effacements)");
+      expect(code).toContain(String.raw`\copy registre_recent ($colonnes) from pstdin`);
+      expect(code).toContain(
+        "insert into public.effacements select * from registre_recent on conflict (reference) do nothing",
+      );
+      expect(position("on conflict (reference) do nothing")).toBeLessThan(
+        position("select public.rejouer_effacements()"),
+      );
+      expect(position("--single-transaction")).toBeLessThan(position("create temp table registre_recent"));
+    });
+
+    it("rapport : références réinjectées ; au moins un effacement si le registre cite la base restaurée", () => {
+      expect(code).toContain("Références réinjectées depuis la sauvegarde n° ");
+      expect(code).toContain('[ "$REGISTRE_PRESENTES" -ge 1 ] && [ "${EFFACEES:-0}" -lt 1 ]');
+      expect(code).toContain("REGISTRE_PRESENTES: ${{ steps.base.outputs.presentes }}");
+    });
+  });
+
   it("ne publie aucun fichier et détruit la base et les fichiers en clair à la fin", () => {
     expect(code).not.toContain("actions/upload-artifact");
     expect(code).toMatch(/Détruire la base jetable et les fichiers en clair\n\s+if: always\(\)/);
