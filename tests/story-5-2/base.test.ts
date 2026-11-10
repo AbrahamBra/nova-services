@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { CLES_DETAILS_JOURNAL, TYPE_EVENEMENT_JOURNAL } from "@/lib/journal";
 import {
@@ -53,8 +53,9 @@ afterAll(async () => {
       await supprimerDemandesTest(base, PREFIXE);
       if (categories.length > 0) {
         await base.query(
-          "delete from public.categories where id = any($1::uuid[]) and nom like 'TEST-5.2-%'",
-          [categories],
+          `delete from public.categories
+            where (id = any($1::uuid[]) or nom like $2) and nom like 'TEST-5.2-%'`,
+          [categories, `${PREFIXE}%`],
         );
       }
     }
@@ -67,6 +68,49 @@ afterAll(async () => {
   );
   await supprimerComptesTest(comptes);
 }, 60_000);
+
+// Après un échec ou un délai dépassé, la connexion partagée ne garde jamais
+// une transaction ouverte (25P02) ni un verrou pour le test suivant.
+afterEach(async () => {
+  await base?.query("rollback").catch(() => {});
+});
+
+/** Délai des tests qui créent des demandes ou ouvrent plusieurs connexions (CI chargée). */
+const LONG = 30_000;
+
+/** Connexion propre à un test, fermée par `fermer` dans un `finally`. */
+async function connexion(): Promise<Client> {
+  const c = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+  await c.connect();
+  return c;
+}
+
+/**
+ * Ferme une connexion de test : la base annule sa transaction en cours et
+ * libère ses verrous, même si une requête y attend encore.
+ */
+async function fermer(c: Client | null): Promise<void> {
+  await c?.end().catch(() => {});
+}
+
+async function pidDe(c: Client): Promise<number> {
+  const { rows } = await c.query<{ pid: number }>("select pg_backend_pid() as pid");
+  return rows[0].pid;
+}
+
+/** Vrai dès que la session `pid` attend un verrou (du type donné), au plus 15 s. */
+async function attendVerrou(pid: number, typeVerrou: string | null = null): Promise<boolean> {
+  const limite = Date.now() + 15_000;
+  while (Date.now() < limite) {
+    const { rowCount } = await base.query(
+      "select 1 from pg_locks where pid = $1 and not granted and ($2::text is null or locktype = $2)",
+      [pid, typeVerrou],
+    );
+    if (rowCount) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}
 
 type ErreurPg = { message: string; detail?: string };
 
@@ -321,58 +365,63 @@ describe("nom unique (prive.normaliser)", () => {
   });
 
   it("course : le même nom ajouté en même temps par deux sessions, une seule réussit", async () => {
-    const autre = new Client({ connectionString: process.env.SUPABASE_DB_URL });
-    await autre.connect();
+    let a: Client | null = null;
+    let b: Client | null = null;
     try {
-      const nom = `${PREFIXE} Course`;
+      a = await connexion();
+      b = await connexion();
+      const pidB = await pidDe(b);
       // Première session : ajout non encore validé.
-      await base.query("begin");
-      await sessionDe(admin);
-      const { rows } = await base.query<{ r: Ajoutee }>("select public.ajouter_categorie($1) as r", [nom]);
+      await a.query("begin");
+      await sessionDe(admin, a);
+      const { rows } = await a.query<{ r: Ajoutee }>("select public.ajouter_categorie($1) as r", [
+        `${PREFIXE} Course`,
+      ]);
       categories.push(rows[0].r.id);
       // Seconde session : attend la fin de la première sur l'index unique.
-      const seconde = erreurDe(
-        enTantQue(admin, "public.ajouter_categorie($1)", [`${PREFIXE} course`], autre),
-      );
-      await new Promise((r) => setTimeout(r, 500));
-      await base.query("commit");
+      const seconde = erreurDe(enTantQue(admin, "public.ajouter_categorie($1)", [`${PREFIXE} course`], b));
+      expect(await attendVerrou(pidB)).toBe(true);
+      await a.query("commit");
       const erreur = await seconde;
       expect(erreur?.message).toBe("NOM_CATEGORIE_PRIS");
       expect(JSON.parse(erreur?.detail ?? "null")).toEqual({ desactivee: false });
     } finally {
-      await base.query("rollback").catch(() => {});
-      await autre.end().catch(() => {});
+      await fermer(b);
+      await fermer(a);
     }
-  });
+  }, LONG);
 });
 
 describe("renommer", () => {
   it("course : deux renommages vers le même nom en même temps, le second reçoit NOM_CATEGORIE_PRIS", async () => {
     const premiere = await ajouter("Course renommage A");
     const seconde = await ajouter("Course renommage B");
-    const autre = new Client({ connectionString: process.env.SUPABASE_DB_URL });
-    await autre.connect();
+    let a: Client | null = null;
+    let b: Client | null = null;
     try {
+      a = await connexion();
+      b = await connexion();
+      const pidB = await pidDe(b);
       // Première session : renommage non encore validé.
-      await base.query("begin");
-      await sessionDe(admin);
-      await base.query("select public.renommer_categorie($1, $2)", [premiere.id, `${PREFIXE} Course cible`]);
+      await a.query("begin");
+      await sessionDe(admin, a);
+      await a.query("select public.renommer_categorie($1, $2)", [premiere.id, `${PREFIXE} Course cible`]);
       // Seconde session : ne voit pas encore le nouveau nom, puis attend sur
       // l'index unique ; le gestionnaire unique_violation répond.
       const perdant = erreurDe(
-        enTantQue(admin, "public.renommer_categorie($1, $2)", [seconde.id, `${PREFIXE} course CIBLE`], autre),
+        enTantQue(admin, "public.renommer_categorie($1, $2)", [seconde.id, `${PREFIXE} course CIBLE`], b),
       );
-      await new Promise((r) => setTimeout(r, 500));
-      await base.query("commit");
+      expect(await attendVerrou(pidB)).toBe(true);
+      await a.query("commit");
       const erreur = await perdant;
       expect(erreur?.message).toBe("NOM_CATEGORIE_PRIS");
       expect(JSON.parse(erreur?.detail ?? "null")).toEqual({ desactivee: false });
       expect((await categorie(seconde.id)).nom).toBe(`${PREFIXE} Course renommage B`);
     } finally {
-      await base.query("rollback").catch(() => {});
-      await autre.end().catch(() => {});
+      await fermer(b);
+      await fermer(a);
     }
-  });
+  }, LONG);
 
   it("nouveau nom lu partout, y compris sur une ancienne demande ; journal avec l'ancien nom", async () => {
     const cible = await ajouter("Conseil");
@@ -398,7 +447,7 @@ describe("renommer", () => {
       nom: `${PREFIXE} Conseils`,
       ancien_nom: `${PREFIXE} Conseil`,
     });
-  });
+  }, LONG);
 
   it("seulement les majuscules de son propre nom : permis ; nom identique : rien n'est écrit", async () => {
     const cible = await ajouter("Logistique");
@@ -493,72 +542,56 @@ describe("désactiver et réactiver", () => {
       ["categorie", admin.id, { evenement: "categorie_desactivee", categorie_id: cible.id, nom: cible.nom }],
       ["categorie", admin.id, { evenement: "categorie_reactivee", categorie_id: cible.id, nom: cible.nom }],
     ]);
-  });
+  }, LONG);
 
-  it("dernière catégorie active : DERNIERE_CATEGORIE (transaction annulée)", async () => {
-    const cible = await ajouter("Dernière");
-    await base.query("begin");
-    try {
-      // Dans cette transaction seulement : toutes les autres désactivées.
-      await base.query("update public.categories set actif = false where id <> $1", [cible.id]);
-      await sessionDe(admin);
-      expect(await codeDe(base.query("select public.desactiver_categorie($1)", [cible.id]))).toBe(
-        "DERNIERE_CATEGORIE",
-      );
-    } finally {
-      await base.query("rollback");
-    }
-    // Rien n'a changé.
-    expect((await categorie(cible.id)).actif).toBe(true);
-    const { rows } = await base.query<{ n: number }>(
-      "select count(*)::integer as n from public.categories where actif and nom not like 'TEST-%'",
+  // Prouver DERNIERE_CATEGORIE en base demanderait de désactiver (même dans
+  // une transaction annulée) les vraies catégories : verrous sur des lignes
+  // partagées avec les autres fichiers de test, lancés en parallèle. La règle
+  // est donc prouvée par l'action simulée (action.test.ts) et ici par le
+  // corps de la fonction : verrou, puis contrôle, puis seulement la mise à jour.
+  it("dernière catégorie active : contrôle DERNIERE_CATEGORIE sous verrou, avant la mise à jour", async () => {
+    const { rows } = await base.query<{ def: string }>(
+      "select pg_get_functiondef('public.desactiver_categorie(uuid)'::regprocedure) as def",
     );
-    expect(rows[0].n).toBeGreaterThan(0);
+    const def = rows[0].def.replace(/\s+/g, " ");
+    const verrou = def.indexOf("pg_advisory_xact_lock(hashtextextended('categories:actives', 0))");
+    const controle = def.indexOf(
+      "if not exists ( select 1 from public.categories c where c.id <> p_id and c.actif ) then raise exception using errcode = 'P0001', message = 'DERNIERE_CATEGORIE';",
+    );
+    const miseAJour = def.indexOf("set actif = false");
+    expect(verrou).toBeGreaterThan(0);
+    expect(controle).toBeGreaterThan(verrou);
+    expect(miseAJour).toBeGreaterThan(controle);
   });
 
   it("verrou consultatif : une seconde désactivation attend la première (transactions annulées)", async () => {
     const x = await ajouter("Verrou X");
     const y = await ajouter("Verrou Y");
-    const autre = new Client({ connectionString: process.env.SUPABASE_DB_URL });
-    await autre.connect();
-    let attente: Promise<unknown> | null = null;
+    let a: Client | null = null;
+    let b: Client | null = null;
     try {
-      const { rows: pid } = await autre.query<{ pid: number }>("select pg_backend_pid() as pid");
+      a = await connexion();
+      b = await connexion();
+      const pidB = await pidDe(b);
       // A : désactivation de X, laissée ouverte (verrou tenu).
-      await base.query("begin");
-      await sessionDe(admin);
-      await base.query("select public.desactiver_categorie($1)", [x.id]);
-      // B : désactivation de Y, qui doit attendre le verrou.
-      await autre.query("begin");
-      await sessionDe(admin, autre);
-      attente = autre.query("select public.desactiver_categorie($1)", [y.id]).catch((e) => e);
-
-      const surveillance = new Client({ connectionString: process.env.SUPABASE_DB_URL });
-      await surveillance.connect();
-      try {
-        let bloque = false;
-        for (let i = 0; i < 50 && !bloque; i++) {
-          const { rows } = await surveillance.query(
-            "select 1 from pg_locks where pid = $1 and locktype = 'advisory' and not granted",
-            [pid[0].pid],
-          );
-          bloque = rows.length > 0;
-          if (!bloque) await new Promise((r) => setTimeout(r, 100));
-        }
-        expect(bloque).toBe(true);
-      } finally {
-        await surveillance.end().catch(() => {});
-      }
+      await a.query("begin");
+      await sessionDe(admin, a);
+      await a.query("select public.desactiver_categorie($1)", [x.id]);
+      // B : désactivation de Y, qui doit attendre le verrou consultatif.
+      await b.query("begin");
+      await sessionDe(admin, b);
+      void b.query("select public.desactiver_categorie($1)", [y.id]).catch(() => {});
+      expect(await attendVerrou(pidB, "advisory")).toBe(true);
     } finally {
-      await base.query("rollback").catch(() => {});
-      if (attente) await attente;
-      await autre.query("rollback").catch(() => {});
-      await autre.end().catch(() => {});
+      // B d'abord (sa désactivation n'est jamais faite), puis A : les deux
+      // transactions sont annulées par la fermeture.
+      await fermer(b);
+      await fermer(a);
     }
     // Rien n'a changé.
     expect((await categorie(x.id)).actif).toBe(true);
     expect((await categorie(y.id)).actif).toBe(true);
-  });
+  }, LONG);
 
   it("id inconnu ou absent : DONNEES_INVALIDES", async () => {
     for (const sql of ["public.desactiver_categorie($1)", "public.activer_categorie($1)"]) {
