@@ -108,8 +108,8 @@ test.describe("connexion à l'espace équipe", () => {
     await expect(menu(page).getByText("Administrateur", { exact: true })).toBeVisible();
     // Story 1.5 : Accueil, Demandes et Administration ; story 2.6 : Saisir une
     // demande ; story 4.1 : « Comptes » remplace « Vue d'ensemble » ; story
-    // 5.1 : « Journal ».
-    await expect(menu(page).getByRole("link")).toHaveCount(5);
+    // 5.1 : « Journal » ; story 5.2 : « Catégories ».
+    await expect(menu(page).getByRole("link")).toHaveCount(6);
     await sansViolationAxe(page);
 
     // Zone administrateur ouverte à l'administrateur.

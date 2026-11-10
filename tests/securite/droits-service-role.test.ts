@@ -192,6 +192,29 @@ describe("sécurité — droits de service_role sur les tables", () => {
     expect(rows[0].peut).toBe(false);
   });
 
+  // Story 5.2 : les catégories se gèrent avec la session de l'administrateur,
+  // jamais avec la clé secrète ; l'utilitaire de nom reste sans aucun droit.
+  it("aucun droit sur les fonctions de gestion des catégories", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.activer_categorie(uuid)',
+                         'public.ajouter_categorie(text)',
+                         'public.desactiver_categorie(uuid)',
+                         'public.lister_categories_admin()',
+                         'public.renommer_categorie(uuid, text)',
+                         'prive.verifier_nom_categorie(text, uuid)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "prive.verifier_nom_categorie(text, uuid)": false,
+      "public.activer_categorie(uuid)": false,
+      "public.ajouter_categorie(text)": false,
+      "public.desactiver_categorie(uuid)": false,
+      "public.lister_categories_admin()": false,
+      "public.renommer_categorie(uuid, text)": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

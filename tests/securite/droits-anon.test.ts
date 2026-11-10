@@ -54,6 +54,10 @@ import { Client } from "pg";
 // Story 5.1 : lire_journal pour authenticated (la fonction vérifie
 // l'administrateur actif) ; le journal lui-même reste sans aucun droit ; rien
 // pour anon.
+// Story 5.2 : lister_categories_admin, ajouter_categorie, renommer_categorie,
+// desactiver_categorie et activer_categorie pour authenticated (les fonctions
+// vérifient l'administrateur actif) ; prive.verifier_nom_categorie sans aucun
+// droit ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -68,6 +72,11 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:prive.est_admin():EXECUTE",
   "authenticated:fonction:prive.est_membre_actif():EXECUTE",
   "authenticated:fonction:public.activer_mon_compte():EXECUTE",
+  "authenticated:fonction:public.activer_categorie(p_id uuid):EXECUTE",
+  "authenticated:fonction:public.ajouter_categorie(p_nom text):EXECUTE",
+  "authenticated:fonction:public.desactiver_categorie(p_id uuid):EXECUTE",
+  "authenticated:fonction:public.lister_categories_admin():EXECUTE",
+  "authenticated:fonction:public.renommer_categorie(p_id uuid, p_nom text):EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
   "authenticated:fonction:public.annuler_invitation(p_id uuid):EXECUTE",
   "authenticated:fonction:public.attribuer(p_demande_id uuid, p_membre_id uuid):EXECUTE",

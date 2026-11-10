@@ -344,16 +344,18 @@ describe("changer_categorie", () => {
 describe("lireCategoriesAvec (session)", () => {
   it("catégories actives dans l'ordre des formulaires, catégorie actuelle avec son état réel", async () => {
     const { rows } = await base.query<Categorie>(
-      "select id, nom from public.categories where actif order by ordre, nom",
+      "select id, nom from public.categories where actif and nom not like 'TEST-%' order by ordre, nom",
     );
+    // Base partagée : d'autres tests (story 5.2…) ajoutent un instant des
+    // catégories « TEST-… » actives ; seules les vraies catégories sont comparées.
+    const reelles = (liste: Categorie[]) => liste.filter((c) => !c.nom.startsWith("TEST-"));
     const active = await lireCategoriesAvec(sessionKarim, technique.id);
-    expect(active).toEqual({
-      ok: true,
-      donnees: { actives: rows, actuelle: { ...technique, actif: true } },
-    });
+    if (!active.ok) throw new Error("lecture attendue");
+    expect(reelles(active.donnees.actives)).toEqual(rows);
+    expect(active.donnees.actuelle).toEqual({ ...technique, actif: true });
     const inactive = await lireCategoriesAvec(sessionKarim, desactivee.id);
     if (!inactive.ok) throw new Error("lecture attendue");
-    expect(inactive.donnees.actives).toEqual(rows);
+    expect(reelles(inactive.donnees.actives)).toEqual(rows);
     expect(inactive.donnees.actuelle).toEqual({ ...desactivee, actif: false });
   });
 

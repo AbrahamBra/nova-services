@@ -54,6 +54,11 @@ export const CLES_DETAILS_JOURNAL: Record<string, readonly string[]> = {
   lien_mot_de_passe_genere: ["evenement", "membre_id", "nom"],
   invitation_renvoyee: ["evenement", "membre_id", "nom"],
   invitation_annulee: ["evenement", "membre_id", "nom"],
+  // Story 5.2 : catégories (nom de la catégorie, jamais une donnée de demandeur).
+  categorie_ajoutee: ["evenement", "categorie_id", "nom"],
+  categorie_renommee: ["evenement", "categorie_id", "nom", "ancien_nom"],
+  categorie_desactivee: ["evenement", "categorie_id", "nom"],
+  categorie_reactivee: ["evenement", "categorie_id", "nom"],
 };
 
 /**
@@ -71,6 +76,10 @@ export const TYPE_EVENEMENT_JOURNAL: Record<string, TypeJournal> = {
   lien_mot_de_passe_genere: "compte",
   invitation_renvoyee: "compte",
   invitation_annulee: "compte",
+  categorie_ajoutee: "categorie",
+  categorie_renommee: "categorie",
+  categorie_desactivee: "categorie",
+  categorie_reactivee: "categorie",
 };
 
 const ECHEC = {
@@ -98,6 +107,12 @@ function entierPositif(valeur: unknown): number | null {
 /** Nom du membre cité par la ligne (enregistré au moment de l'événement). */
 function nomCite(details: Record<string, unknown>): string {
   return texte(details.nom) ?? AUTEUR_MEMBRE_INCONNU;
+}
+
+/** Nom de la catégorie citée par la ligne (enregistré au moment de l'événement). */
+export const CATEGORIE_SANS_NOM = "(nom inconnu)";
+function nomCategorie(valeur: unknown): string {
+  return texte(valeur) ?? CATEGORIE_SANS_NOM;
 }
 
 const PRECISION_BLOCAGE: Record<string, string> = {
@@ -131,6 +146,14 @@ export const PHRASES_JOURNAL: Record<string, (details: Record<string, unknown>) 
   lien_mot_de_passe_genere: (d) => `Lien de mot de passe généré pour ${nomCite(d)}`,
   invitation_renvoyee: (d) => `Invitation renvoyée à ${nomCite(d)}`,
   invitation_annulee: (d) => `Invitation annulée : ${nomCite(d)}`,
+  // Story 5.2 : le nom enregistré au moment de l'événement.
+  categorie_ajoutee: (d) => `Catégorie ajoutée : ${nomCategorie(d.nom)}`,
+  categorie_renommee: (d) => {
+    const ancien = texte(d.ancien_nom);
+    return `Catégorie renommée : ${ancien ? `${ancien} → ` : ""}${nomCategorie(d.nom)}`;
+  },
+  categorie_desactivee: (d) => `Catégorie désactivée : ${nomCategorie(d.nom)}`,
+  categorie_reactivee: (d) => `Catégorie réactivée : ${nomCategorie(d.nom)}`,
   connexion_bloquee: (d) => {
     // Durée affichée seulement si elle est enregistrée.
     const duree = entierPositif(d.duree_minutes);
