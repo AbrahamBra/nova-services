@@ -168,6 +168,21 @@ describe("sécurité — droits de service_role sur les tables", () => {
     });
   });
 
+  // Story 4.4 : le renvoi et l'annulation d'une invitation se font avec la
+  // session de l'administrateur, jamais avec la clé secrète.
+  it("aucun droit sur noter_renvoi_invitation ni annuler_invitation", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.annuler_invitation(uuid)',
+                         'public.noter_renvoi_invitation(uuid)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.annuler_invitation(uuid)": false,
+      "public.noter_renvoi_invitation(uuid)": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

@@ -60,7 +60,13 @@ export const MESSAGES_COMPTE = {
   modifie: "Compte modifié.",
   desactive: "Compte désactivé.",
   reactive: "Compte réactivé.",
+  invitationAnnulee: "Invitation annulée.",
 } as const;
+
+/** Texte de la fenêtre « Annuler l'invitation » (story 4.4). */
+export function texteAnnulationInvitation(nom: string): string {
+  return `L'invitation de ${nom} sera annulée et son compte disparaîtra de la liste.`;
+}
 
 /** Texte de la fenêtre « Désactiver » (EXPERIENCE.md §9.7). */
 export function texteDesactivation(nom: string, demandesEnCours: number): string[] {

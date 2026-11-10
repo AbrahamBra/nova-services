@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 // Liste des comptes (EXPERIENCE.md §9.7, story 4.1) : tableau Nom · Email ·
 // Rôle · État sur tablette et ordinateur ; une carte par compte sur
 // téléphone (< 640 px). Trié par nom (lib/comptes.ts). Story 4.2 : colonne
-// Actions (Modifier, Désactiver, Réactiver selon l'état, actions-compte.tsx).
+// Actions (Modifier, Désactiver, Réactiver selon l'état, actions-compte.tsx) ;
+// story 4.4 : Renvoyer et Annuler l'invitation pour un compte Invité.
 
 /** Seul l'administrateur connecté : message de liste vide. */
 export const MESSAGE_AUCUN_COMPTE = "Aucun autre compte. Invitez un premier collaborateur.";

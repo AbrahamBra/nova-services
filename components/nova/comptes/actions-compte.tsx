@@ -27,10 +27,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
+  annulerInvitation,
   desactiverMembre,
   genererLienMotDePasse,
   modifierMembre,
   reactiverMembre,
+  renvoyerInvitation,
   type ResultatModification,
 } from "@/lib/actions/admin";
 import type { Compte } from "@/lib/comptes";
@@ -38,6 +40,7 @@ import { messageErreur, type CodeErreur } from "@/lib/erreurs";
 import {
   MESSAGES_COMPTE,
   premierChampModificationEnErreur,
+  texteAnnulationInvitation,
   texteDesactivation,
   verifierModification,
   type ChampModification,
@@ -46,7 +49,7 @@ import {
 import { OPTIONS_ROLE } from "@/lib/schemas/invitation";
 
 // Actions d'un compte (EXPERIENCE.md §9.7, story 4.2), selon son état :
-//   - Invité : Modifier ;
+//   - Invité : Modifier, Renvoyer l'invitation, Annuler l'invitation (story 4.4) ;
 //   - Actif : Modifier, Générer un lien de mot de passe (story 4.3), Désactiver ;
 //   - Désactivé : Modifier, Réactiver.
 // Sur la ligne de l'administrateur connecté : « Modifier » sans champ Rôle,
@@ -92,6 +95,8 @@ export function ActionsCompte({ compte, estMoi }: { compte: Compte; estMoi: bool
       className="flex flex-wrap gap-2"
     >
       <FenetreModifier compte={compte} estMoi={estMoi} />
+      {compte.etat === "invite" ? <BoutonRenvoyerInvitation compte={compte} /> : null}
+      {compte.etat === "invite" ? <FenetreAnnulerInvitation compte={compte} /> : null}
       {compte.etat === "actif" && !estMoi ? <BoutonLienMotDePasse compte={compte} /> : null}
       {compte.etat === "actif" && !estMoi ? (
         <FenetreDesactiver
@@ -578,5 +583,165 @@ function BoutonLienMotDePasse({ compte }: { compte: Compte }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// --- Renvoyer ou annuler une invitation (story 4.4) ------------------------------
+
+/**
+ * « Renvoyer l'invitation » : sans confirmation, puis la fenêtre du lien
+ * (mode démonstration) avec le nouveau lien et « Copier ». L'ancien lien
+ * devient invalide. Refus : toast d'erreur.
+ */
+function BoutonRenvoyerInvitation({ compte }: { compte: Compte }) {
+  const [envoi, demarrer] = useTransition();
+  const enVol = useRef(false);
+  const boutonRef = useRef<HTMLButtonElement>(null);
+  const [lien, setLien] = useState<{ nom: string; lien: string } | null>(null);
+  const { afficher } = useToasts();
+
+  function renvoyer() {
+    if (enVol.current) return;
+    enVol.current = true;
+    demarrer(async () => {
+      let resultat: Awaited<ReturnType<typeof renvoyerInvitation>>;
+      try {
+        resultat = await renvoyerInvitation(compte.id);
+      } catch {
+        resultat = echecInattendu();
+      } finally {
+        enVol.current = false;
+      }
+      if (resultat.ok) setLien(resultat.donnees);
+      else afficher("erreur", resultat.message);
+    });
+  }
+
+  return (
+    <>
+      <Button
+        ref={boutonRef}
+        type="button"
+        variant="outline"
+        disabled={envoi}
+        onClick={renvoyer}
+        className={CLASSE_ACTION}
+      >
+        {envoi ? "Envoi en cours…" : "Renvoyer l'invitation"}
+        <NomCache nom={compte.nom} />
+      </Button>
+      <Dialog
+        open={lien !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) setLien(null);
+        }}
+      >
+        <DialogContent
+          onCloseAutoFocus={(evenement) => {
+            // Le focus revient au bouton de la ligne.
+            evenement.preventDefault();
+            boutonRef.current?.focus();
+          }}
+        >
+          {lien ? (
+            <ContenuLien
+              titre="Lien d'invitation"
+              description={`Aucun email n'est envoyé : copiez ce nouveau lien et transmettez-le à ${lien.nom}. L'ancien lien n'est plus valable.`}
+              libelle="Lien d'invitation"
+              lien={lien.lien}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * Fenêtre de confirmation « Annuler l'invitation » (modèle
+ * `FenetreDesactiver`) : « Retour » à gauche et sélectionné à l'ouverture,
+ * bouton destructeur à droite, focus gardé dans la fenêtre. Après
+ * confirmation, le compte disparaît de la liste (revalidatePath).
+ */
+function FenetreAnnulerInvitation({ compte }: { compte: Compte }) {
+  const [ouverte, setOuverte] = useState(false);
+  const [envoi, demarrer] = useTransition();
+  const enVol = useRef(false);
+  // Après l'annulation, la ligne (et ce bouton) disparaît : le focus va au
+  // bouton « Inviter un membre ».
+  const annulee = useRef(false);
+  const { afficher } = useToasts();
+
+  function changerOuverture(valeur: boolean) {
+    if (!valeur && enVol.current) return;
+    setOuverte(valeur);
+  }
+
+  function confirmer() {
+    if (enVol.current) return;
+    enVol.current = true;
+    demarrer(async () => {
+      let resultat: ResultatSimple;
+      try {
+        const reponse = await annulerInvitation(compte.id);
+        resultat = reponse.ok ? { ok: true } : reponse;
+      } catch {
+        resultat = echecInattendu();
+      } finally {
+        enVol.current = false;
+      }
+      annulee.current = resultat.ok;
+      if (resultat.ok) afficher("succes", MESSAGES_COMPTE.invitationAnnulee);
+      else afficher("erreur", resultat.message);
+      setOuverte(false);
+    });
+  }
+
+  return (
+    <AlertDialog open={ouverte} onOpenChange={changerOuverture}>
+      <Button
+        type="button"
+        variant="outline"
+        className={CLASSE_ACTION}
+        onClick={() => setOuverte(true)}
+      >
+        Annuler l&apos;invitation
+        <NomCache nom={compte.nom} />
+      </Button>
+      <AlertDialogContent
+        onCloseAutoFocus={(evenement) => {
+          if (!annulee.current) return;
+          evenement.preventDefault();
+          document.querySelector<HTMLButtonElement>("[data-inviter-membre]")?.focus();
+        }}
+        className="rounded-lg bg-surface p-5 shadow-sm data-[size=default]:max-w-[calc(100%-2rem)] data-[size=default]:sm:max-w-md"
+      >
+        <AlertDialogHeader className="place-items-start text-left">
+          <AlertDialogTitle className="text-lg font-semibold leading-[1.4]">
+            Annuler l&apos;invitation
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-left text-sm leading-[1.5] text-foreground">
+            {texteAnnulationInvitation(compte.nom)}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {/* « Retour » à gauche, bouton destructeur à droite. */}
+        <AlertDialogFooter className="-mx-5 -mb-5 bg-surface p-5 sm:justify-between">
+          <AlertDialogCancel
+            disabled={envoi}
+            className="h-11 rounded-md bg-surface px-5 text-[15px] font-semibold text-foreground"
+          >
+            Retour
+          </AlertDialogCancel>
+          <Button
+            type="button"
+            disabled={envoi}
+            onClick={confirmer}
+            className="h-11 rounded-md bg-destructive px-5 text-[15px] font-semibold text-white hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/40"
+          >
+            {envoi ? "Annulation…" : "Annuler l'invitation"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
