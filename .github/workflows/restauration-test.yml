@@ -219,7 +219,7 @@ jobs:
           # session_replication_role : il faut le super-utilisateur de la base
           # locale (mot de passe par défaut de la CLI, base jetable seulement).
           # Le rôle postgres local n'a pas ces droits (erreur 42501).
-          adresse=$(printf '%s' "$adresse" | sed -E 's#^(postgres(ql)?://)[^:@]+(:[^@]*)?@#\1supabase_admin:postgres@#')
+          adresse=$(printf '%s' "$adresse" | sed -E 's#^(postgres(ql)?://)[^:@]+(:[^@]*)?@#\1supabase_admin:postgres@#')
           echo "::add-mask::$adresse"
           echo "BASE_JETABLE=$adresse" >> "$GITHUB_ENV"
           echo "Base jetable démarrée sur cette machine."

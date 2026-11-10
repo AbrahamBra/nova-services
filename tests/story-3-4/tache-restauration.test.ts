@@ -175,3 +175,20 @@ describe("tâche « Restauration de test »", () => {
     expect(code).toContain('"$RUNNER_TEMP/restauration"');
   });
 });
+
+describe("fichiers des tâches GitHub", () => {
+  // Incident du 10/11/2026 : un caractère de contrôle invisible dans la tâche
+  // de restauration l'a rendue illisible pour GitHub (plus de lancement
+  // manuel possible).
+  it("ne contiennent aucun caractère de contrôle invisible", () => {
+    for (const fichier of [
+      ".github/workflows/restauration-test.yml",
+      ".github/workflows/sauvegarde-nocturne.yml",
+      ".github/workflows/reveil.yml",
+      ".github/workflows/tests.yml",
+    ]) {
+      // eslint-disable-next-line no-control-regex
+      expect(lire(fichier), fichier).not.toMatch(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/);
+    }
+  });
+});
