@@ -104,7 +104,8 @@ test.describe("story 5.3 — paramètres (sans changer les valeurs)", () => {
     if (await boutonMenu(page).isVisible()) await boutonMenu(page).click();
     const libelles = await menu(page).getByRole("link").allTextContents();
     expect(libelles.indexOf("Paramètres")).toBe(libelles.indexOf("Catégories") + 1);
-    expect(libelles.indexOf("Journal")).toBe(libelles.indexOf("Paramètres") + 1);
+    // Story 5.4 : « Données » entre « Paramètres » et « Journal ».
+    expect(libelles.indexOf("Journal")).toBeGreaterThan(libelles.indexOf("Paramètres"));
     await menu(page).getByRole("link", { name: "Paramètres" }).click();
     await expect(page).toHaveURL(new RegExp(`${CHEMIN}$`), NAVIGATION);
     await expect(page.getByRole("heading", { level: 1, name: "Paramètres" })).toBeVisible(NAVIGATION);

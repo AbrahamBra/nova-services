@@ -118,7 +118,7 @@
   summary: Une prise en charge au même instant qu'une désactivation peut laisser une demande En cours au nom d'un compte désactivé.
   evidence: non vérifié (medium s'il est réel) ; `prendre_en_charge` ne verrouille pas la ligne `membres` ; à corriger par un `for share` sur le membre dans `prendre_en_charge`.
 
-- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md` (écriture dans `effacements` TRAITÉE en story 5.4 ; essai de restauration à refaire)
   summary: Faire écrire `effacer_demandeur` (epic 5) dans `effacements`, avec un test, puis refaire l'essai de restauration après la story 5.4 en vérifiant un vrai rejeu.
   evidence: Le registre n'est rempli par rien aujourd'hui ; seul un commentaire de la migration le rappelle.
 - source_spec: `_bmad-output/implementation-artifacts/spec-3-4-restaurer-une-sauvegarde.md`
@@ -141,3 +141,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-5-3-parametres-generaux.md`
   summary: Le test `parametres.reel.spec.ts` modifie quelques secondes la ligne partagée `parametres` de nova-dev ; deux exécutions qui se chevauchent pourraient se gêner.
   evidence: non observé ; à surveiller si un test du formulaire public échoue de façon isolée ; protection possible par un verrou consultatif pendant le test.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-4-effacer-donnees-personne.md`
+  summary: Les demandes sans email (saisies par l'équipe au téléphone ou au guichet) ne peuvent pas être retrouvées ni effacées par la page Données personnelles.
+  evidence: `demandes.email` est facultatif pour la saisie interne ; la recherche se fait par email exact (décision du plan). À décider avec Abraham : recherche complémentaire par téléphone ou par nom, avec confirmation.
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-4-effacer-donnees-personne.md`
+  summary: Les messages d'erreur de l'écran d'effacement (refus, erreur imprévue) ne sont vérifiés par aucun test d'écran.
+  evidence: même convention que les autres écrans d'administration ; à couvrir par un test navigateur qui provoque un refus.

@@ -70,6 +70,10 @@ export const MESSAGES_ERREUR = {
   NOM_CATEGORIE_PRIS: "Ce nom est déjà pris.",
   DERNIERE_CATEGORIE: "Il doit rester au moins une catégorie active.",
   ETAT_CATEGORIE_INVALIDE: "Cette action n'est pas possible pour l'état actuel de cette catégorie.",
+  // Story 5.4 — droit à l'effacement (effacer_demandeur) : les demandes de
+  // cet email ne sont plus celles de la recherche (nouvelle demande, ou
+  // demande déjà effacée) ; rien n'a été effacé.
+  DEMANDES_CHANGEES: "La liste a changé depuis votre recherche. Vérifiez-la avant d'effacer.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;

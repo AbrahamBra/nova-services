@@ -1,7 +1,7 @@
 import "server-only";
 import { LIBELLES_ROLE, ROLES, TYPES_JOURNAL, type Role, type TypeJournal } from "@/lib/domaine";
 import { messageErreur } from "@/lib/erreurs";
-import { formaterDuree } from "@/lib/format";
+import { formaterDuree, formaterNombre } from "@/lib/format";
 import { bornerPage, TAILLE_PAGE_JOURNAL } from "@/lib/filtres";
 import { appeler, signaler, type ClientRpc, type Resultat } from "@/lib/server/appeler";
 import { creerClientServeur } from "@/lib/supabase/serveur";
@@ -73,6 +73,9 @@ export const CLES_DETAILS_JOURNAL: Record<string, readonly string[]> = {
     "duree_conservation_mois",
     "ancienne_duree_conservation_mois",
   ],
+  // Story 5.4 : le nombre de demandes effacées seulement (jamais l'email, le
+  // nom ni les références de la personne).
+  demandeur_efface: ["evenement", "nombre"],
 };
 
 /**
@@ -139,6 +142,7 @@ export const TYPE_EVENEMENT_JOURNAL: Record<string, TypeJournal> = {
   categorie_desactivee: "categorie",
   categorie_reactivee: "categorie",
   parametres_modifies: "parametre",
+  demandeur_efface: "donnees",
 };
 
 const ECHEC = {
@@ -243,6 +247,14 @@ export const PHRASES_JOURNAL: Record<string, (details: Record<string, unknown>) 
     return changements.length === 0
       ? "Paramètres modifiés"
       : `Paramètres modifiés : ${changements.join(" ; ")}`;
+  },
+  // Story 5.4 : « 3 demandes effacées (droit à l'effacement) ».
+  demandeur_efface: (d) => {
+    const n = entierPositif(d.nombre);
+    if (n === null) return "Demandes effacées (droit à l'effacement)";
+    return n === 1
+      ? "1 demande effacée (droit à l'effacement)"
+      : `${formaterNombre(n)} demandes effacées (droit à l'effacement)`;
   },
   connexion_bloquee: (d) => {
     // Durée affichée seulement si elle est enregistrée.

@@ -31,15 +31,30 @@ async function compter(table: string, demandeId: string): Promise<number> {
   return rows[0].n;
 }
 
-/** Garde-fou avant chaque appel : aucune référence étrangère au test dans le registre. */
-async function registreLimiteAuTest(): Promise<void> {
-  const { rows } = await base.query<{ n: number }>(
-    "select count(*)::int as n from public.effacements where reference <> all($1::text[])",
+/**
+ * Références étrangères au test que le rejeu effacerait : inscrites au
+ * registre ET dont la demande existe encore. Story 5.4 : `effacer_demandeur`
+ * (autres fichiers de test lancés en même temps) inscrit des références dont
+ * la demande est déjà effacée, dans la même transaction ; le rejeu les
+ * ignore, elles ne gênent donc pas ce test.
+ */
+async function referencesEtrangeresActives(): Promise<string[]> {
+  const { rows } = await base.query<{ reference: string }>(
+    `select e.reference
+       from public.effacements e
+       join public.demandes d on d.reference = e.reference
+      where e.reference <> all($1::text[])`,
     [references],
   );
-  if (rows[0].n > 0) {
+  return rows.map((l) => l.reference);
+}
+
+/** Garde-fou avant chaque appel : le rejeu ne toucherait que les demandes de ce test. */
+async function registreLimiteAuTest(): Promise<void> {
+  const etrangeres = await referencesEtrangeresActives();
+  if (etrangeres.length > 0) {
     throw new Error(
-      `Registre effacements non vide hors de ce test (${rows[0].n} ligne(s)) : rejeu refusé sur la base partagée.`,
+      `Registre effacements : ${etrangeres.length} demande(s) hors de ce test seraient effacées : rejeu refusé sur la base partagée.`,
     );
   }
 }
@@ -84,15 +99,12 @@ afterAll(async () => {
 
 describe("rejouer_effacements() (AD-30)", () => {
   // La fonction efface pour toute la base (partagée) : on ne l'appelle que si
-  // le registre ne contient que les références de ce test.
-  it("le registre ne contient que les références de ce test", async () => {
-    const { rows } = await base.query<{ reference: string }>(
-      "select reference from public.effacements where reference <> all($1::text[])",
-      [references],
-    );
+  // elle n'effacerait que les demandes de ce test. Les autres références du
+  // registre (demandes déjà effacées, story 5.4) sont sans effet.
+  it("le rejeu n'effacerait que les demandes de ce test", async () => {
     expect(
-      rows.map((l) => l.reference),
-      "Registre effacements de la base de développement non vide (hors ce test) : rejeu refusé, il effacerait des demandes d'une autre session. Videz les lignes restantes avant de relancer.",
+      await referencesEtrangeresActives(),
+      "Registre effacements de la base de développement : des demandes existantes d'une autre session y figurent ; le rejeu les effacerait. Retirez ces lignes avant de relancer.",
     ).toEqual([]);
   });
 
