@@ -215,6 +215,22 @@ describe("sécurité — droits de service_role sur les tables", () => {
     });
   });
 
+  // Story 5.3 : les paramètres se lisent et se modifient avec la session de
+  // l'administrateur, jamais avec la clé secrète (infos_publiques reste la
+  // seule lecture du serveur).
+  it("aucun droit sur les fonctions de la page Paramètres", async () => {
+    const { rows } = await client.query<{ fonction: string; peut: boolean }>(
+      `select f.fonction, has_function_privilege('service_role', f.fonction, 'EXECUTE') as peut
+       from unnest(array['public.lire_parametres_admin()',
+                         'public.modifier_parametres(text, text, integer)']) as f(fonction)
+       order by 1`,
+    );
+    expect(Object.fromEntries(rows.map((l) => [l.fonction, l.peut]))).toEqual({
+      "public.lire_parametres_admin()": false,
+      "public.modifier_parametres(text, text, integer)": false,
+    });
+  });
+
   it("aucun usage direct des séquences de l'historique, du journal, des envois, des tentatives et des notes", async () => {
     for (const sequence of [
       "public.historique_id_seq",

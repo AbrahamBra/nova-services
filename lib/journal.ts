@@ -1,6 +1,7 @@
 import "server-only";
 import { LIBELLES_ROLE, ROLES, TYPES_JOURNAL, type Role, type TypeJournal } from "@/lib/domaine";
 import { messageErreur } from "@/lib/erreurs";
+import { formaterDuree } from "@/lib/format";
 import { bornerPage, TAILLE_PAGE_JOURNAL } from "@/lib/filtres";
 import { appeler, signaler, type ClientRpc, type Resultat } from "@/lib/server/appeler";
 import { creerClientServeur } from "@/lib/supabase/serveur";
@@ -42,7 +43,9 @@ export const AUTEUR_MEMBRE_INCONNU = "Membre inconnu";
 /**
  * Clés de `details` de chaque événement connu (liste fermée, AD-14) : codes,
  * identifiants et noms de MEMBRES seulement, jamais une donnée de demandeur.
- * Vérifiée sur toute la base par tests/story-5-1/base.test.ts.
+ * Toutes présentes, sauf pour les événements de EVENEMENTS_CLES_FACULTATIVES
+ * (clés PERMISES, seule `evenement` obligatoire). Vérifiée sur toute la base
+ * par tests/story-5-1/base.test.ts (`clesJournalValides`).
  */
 export const CLES_DETAILS_JOURNAL: Record<string, readonly string[]> = {
   echec_confirmation: ["evenement", "reference", "code"],
@@ -59,7 +62,62 @@ export const CLES_DETAILS_JOURNAL: Record<string, readonly string[]> = {
   categorie_renommee: ["evenement", "categorie_id", "nom", "ancien_nom"],
   categorie_desactivee: ["evenement", "categorie_id", "nom"],
   categorie_reactivee: ["evenement", "categorie_id", "nom"],
+  // Story 5.3 : seulement les champs changés, chacun avec son ancienne valeur
+  // (paramètres de l'organisation, jamais une donnée de demandeur).
+  parametres_modifies: [
+    "evenement",
+    "nom_affiche",
+    "ancien_nom_affiche",
+    "email_contact",
+    "ancien_email_contact",
+    "duree_conservation_mois",
+    "ancienne_duree_conservation_mois",
+  ],
 };
+
+/**
+ * Événements dont les clés de CLES_DETAILS_JOURNAL sont permises, pas toutes
+ * obligatoires : `evenement` toujours, puis chaque valeur changée avec son
+ * ancienne valeur (story 5.3).
+ */
+export const EVENEMENTS_CLES_FACULTATIVES: ReadonlySet<string> = new Set(["parametres_modifies"]);
+
+/** Paires nouvelle / ancienne valeur des événements à clés facultatives : les deux ou aucune. */
+const PAIRES_CLES: Record<string, readonly (readonly [string, string])[]> = {
+  parametres_modifies: [
+    ["nom_affiche", "ancien_nom_affiche"],
+    ["email_contact", "ancien_email_contact"],
+    ["duree_conservation_mois", "ancienne_duree_conservation_mois"],
+  ],
+};
+
+/**
+ * Les clés d'une ligne sont-elles celles de son événement ? Exactement la
+ * liste ; ou, pour un événement à clés facultatives, `evenement` plus au
+ * moins une paire complète, aucune clé hors liste.
+ */
+export function clesJournalValides(evenement: string, cles: readonly string[]): boolean {
+  if (!Object.hasOwn(CLES_DETAILS_JOURNAL, evenement)) return false;
+  const attendues = CLES_DETAILS_JOURNAL[evenement];
+  if (!EVENEMENTS_CLES_FACULTATIVES.has(evenement)) {
+    return [...cles].sort().join("|") === [...attendues].sort().join("|");
+  }
+  if (!cles.includes("evenement") || cles.some((cle) => !attendues.includes(cle))) return false;
+  const paires = PAIRES_CLES[evenement];
+  if (paires === undefined) {
+    throw new Error(
+      `clesJournalValides : « ${evenement} » est dans EVENEMENTS_CLES_FACULTATIVES sans entrée dans PAIRES_CLES`,
+    );
+  }
+  let completes = 0;
+  for (const [nouvelle, ancienne] of paires) {
+    const a = cles.includes(nouvelle);
+    const b = cles.includes(ancienne);
+    if (a !== b) return false;
+    if (a) completes += 1;
+  }
+  return completes > 0;
+}
 
 /**
  * Type de ligne attendu pour chaque événement connu (mêmes clés que
@@ -80,6 +138,7 @@ export const TYPE_EVENEMENT_JOURNAL: Record<string, TypeJournal> = {
   categorie_renommee: "categorie",
   categorie_desactivee: "categorie",
   categorie_reactivee: "categorie",
+  parametres_modifies: "parametre",
 };
 
 const ECHEC = {
@@ -113,6 +172,22 @@ function nomCite(details: Record<string, unknown>): string {
 export const CATEGORIE_SANS_NOM = "(nom inconnu)";
 function nomCategorie(valeur: unknown): string {
   return texte(valeur) ?? CATEGORIE_SANS_NOM;
+}
+
+/** « 3 ans » ; null si la valeur enregistrée n'est pas une durée. */
+function duree(valeur: unknown): string | null {
+  const mois = entierPositif(valeur);
+  return mois === null ? null : formaterDuree(mois);
+}
+
+/**
+ * « libellé « a » → « b » », seulement si les deux valeurs sont lisibles et
+ * différentes. Valeurs entre guillemets : un nom contenant « ; » ou « → »
+ * reste sans ambiguïté.
+ */
+function changement(libelle: string, ancien: string | null, nouveau: string | null): string | null {
+  if (ancien === null || nouveau === null || ancien === nouveau) return null;
+  return `${libelle} « ${ancien} » → « ${nouveau} »`;
 }
 
 const PRECISION_BLOCAGE: Record<string, string> = {
@@ -154,6 +229,21 @@ export const PHRASES_JOURNAL: Record<string, (details: Record<string, unknown>) 
   },
   categorie_desactivee: (d) => `Catégorie désactivée : ${nomCategorie(d.nom)}`,
   categorie_reactivee: (d) => `Catégorie réactivée : ${nomCategorie(d.nom)}`,
+  // Story 5.3 : seulement les champs changés, dans l'ordre de la page.
+  parametres_modifies: (d) => {
+    const changements = [
+      changement("nom affiché", texte(d.ancien_nom_affiche), texte(d.nom_affiche)),
+      changement("email de contact", texte(d.ancien_email_contact), texte(d.email_contact)),
+      changement(
+        "durée de conservation",
+        duree(d.ancienne_duree_conservation_mois),
+        duree(d.duree_conservation_mois),
+      ),
+    ].filter((c): c is string => c !== null);
+    return changements.length === 0
+      ? "Paramètres modifiés"
+      : `Paramètres modifiés : ${changements.join(" ; ")}`;
+  },
   connexion_bloquee: (d) => {
     // Durée affichée seulement si elle est enregistrée.
     const duree = entierPositif(d.duree_minutes);

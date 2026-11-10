@@ -31,9 +31,11 @@ const RUBRIQUES: Rubrique[] = [
 // Story 4.1 : « Comptes » remplace la page provisoire « Vue d'ensemble ».
 // Story 5.1 : « Journal » après « Comptes ».
 // Story 5.2 : « Catégories » entre « Comptes » et « Journal ».
+// Story 5.3 : « Paramètres » entre « Catégories » et « Journal ».
 const RUBRIQUES_ADMIN: Rubrique[] = [
   { libelle: "Comptes", adresse: "/equipe/admin/comptes" },
   { libelle: "Catégories", adresse: "/equipe/admin/categories" },
+  { libelle: "Paramètres", adresse: "/equipe/admin/parametres" },
   { libelle: "Journal", adresse: "/equipe/admin/journal" },
 ];
 

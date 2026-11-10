@@ -6,6 +6,10 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3210;
 const enCI = !!process.env.CI;
 
+// Story 5.3 : fichiers `*.reel.spec.ts`, joués seulement par le projet
+// « valeurs-reelles », après les projets « ordinateur » et « telephone ».
+const FICHIERS_VALEURS_REELLES = "**/*.reel.spec.ts";
+
 export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.spec.ts",
@@ -23,8 +27,18 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "ordinateur", use: { ...devices["Desktop Chrome"] } },
-    { name: "telephone", use: { ...devices["Pixel 7"] } },
+    { name: "ordinateur", use: { ...devices["Desktop Chrome"] }, testIgnore: FICHIERS_VALEURS_REELLES },
+    { name: "telephone", use: { ...devices["Pixel 7"] }, testIgnore: FICHIERS_VALEURS_REELLES },
+    // Story 5.3 : tests qui enregistrent de vraies valeurs partagées (ligne
+    // `parametres`, lue par le formulaire public et par d'autres tests). Ils
+    // passent APRÈS tous les autres (dépendance) et remettent toujours les
+    // valeurs de départ.
+    {
+      name: "valeurs-reelles",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: FICHIERS_VALEURS_REELLES,
+      dependencies: ["ordinateur", "telephone"],
+    },
   ],
   webServer: {
     // En CI : version construite (plus proche de la production).
