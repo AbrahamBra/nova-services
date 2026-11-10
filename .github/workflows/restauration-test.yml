@@ -214,6 +214,12 @@ jobs:
             echo "::error::La base de restauration n'est pas locale : arrêt."
             exit 1
           fi
+          # La restauration écrit dans des tables qui appartiennent à
+          # supabase_admin (schémas auth, storage…) et règle
+          # session_replication_role : il faut le super-utilisateur de la base
+          # locale (mot de passe par défaut de la CLI, base jetable seulement).
+          # Le rôle postgres local n'a pas ces droits (erreur 42501).
+          adresse=$(printf '%s' "$adresse" | sed -E 's#^(postgres(ql)?://)[^:@]+(:[^@]*)?@#\1supabase_admin:postgres@#')
           echo "::add-mask::$adresse"
           echo "BASE_JETABLE=$adresse" >> "$GITHUB_ENV"
           echo "Base jetable démarrée sur cette machine."
