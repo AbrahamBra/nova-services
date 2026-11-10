@@ -27,7 +27,8 @@ import { creerClientServeur } from "@/lib/supabase/serveur";
 
 // Actions serveur d'administration des comptes (epic 4, AD-1, AD-7).
 // Story 4.1 : invitation d'un nouveau membre. Story 4.2 : modifier,
-// désactiver, réactiver un compte. Story 4.3 : lien de mot de passe. Le rôle d'administrateur est revérifié
+// désactiver, réactiver un compte. Story 4.3 : lien de mot de passe. Story 4.4 :
+// renvoyer ou annuler une invitation. Le rôle d'administrateur est revérifié
 // par chaque action (jamais seulement par l'écran), puis par la base.
 
 /** Durée du blocage Auth d'un compte désactivé (environ 100 ans). */
@@ -450,4 +451,149 @@ export async function genererLienMotDePasse(
     signaler(`[genererLienMotDePasse] exception pendant generateLink : id=${id}`);
     return refus("ERREUR_INATTENDUE");
   }
+}
+
+// --- Story 4.4 : renvoyer ou annuler une invitation -------------------------
+
+/**
+ * Identifiant bien formé mais inconnu de la base (invitation déjà annulée
+ * par un autre administrateur) : traité comme ETAT_COMPTE_INVALIDE, pour
+ * que la liste soit rafraîchie.
+ */
+function sansMembre(code: CodeErreur): CodeErreur {
+  return code === "DONNEES_INVALIDES" ? "ETAT_COMPTE_INVALIDE" : code;
+}
+
+/**
+ * Renvoie l'invitation d'un membre invité (story 4.4, mode démonstration :
+ * le nouveau lien est affiché à l'administrateur, qui le copie). Profil
+ * administrateur revérifié (sinon ACCES_REFUSE) → adresse du site →
+ * `noter_renvoi_invitation` avec la SESSION de l'administrateur (membre
+ * invité seulement, sinon ETAT_COMPTE_INVALIDE ; journal
+ * `invitation_renvoyee` ; renvoie l'email) → `generateLink({ type:
+ * "invite" })`, qui renvoie le même compte Auth (non confirmé) avec un
+ * nouveau jeton : l'ancien lien devient invalide. Aucun email envoyé.
+ * Compte Auth déjà confirmé (lien ouvert sans mot de passe choisi,
+ * `email_exists`) : lien `recovery` à la place, même fenêtre. Si Auth
+ * renvoie un autre compte ou échoue : erreur ; seul un compte créé par cet
+ * appel est supprimé.
+ */
+export async function renvoyerInvitation(
+  membreId: unknown,
+): Promise<ResultatAction<{ nom: string; lien: string }>> {
+  const admin = await verifierAdmin();
+  if (!admin.ok) return refus(admin.code);
+
+  const identifiant = schemaIdCompte.safeParse(membreId);
+  if (!identifiant.success) return refus("DONNEES_INVALIDES");
+  const id = identifiant.data;
+
+  const site = adresseDuSite();
+  if (site === null) {
+    console.error("[renvoyerInvitation] NEXT_PUBLIC_SITE_URL absente ou invalide : aucun lien");
+    return refus("ADRESSE_SITE_MANQUANTE");
+  }
+
+  const client = await clientSession("renvoyerInvitation");
+  if (!client) return refus("ERREUR_INATTENDUE");
+
+  // La base vérifie l'état `invite` AVANT tout appel à Auth.
+  const note = await appeler<unknown>(client, "noter_renvoi_invitation", { p_id: id });
+  if (!note.ok) return refusBase(sansMembre(note.code));
+  const { nom, email } = (note.donnees ?? {}) as { nom?: unknown; email?: unknown };
+  if (typeof nom !== "string" || typeof email !== "string" || email === "") {
+    signaler("[renvoyerInvitation] réponse inattendue de noter_renvoi_invitation");
+    return refus("ERREUR_INATTENDUE");
+  }
+
+  let service: ReturnType<typeof creerClientService>;
+  try {
+    service = creerClientService();
+  } catch {
+    console.error("[renvoyerInvitation] client service indisponible");
+    return refus("ERREUR_INATTENDUE");
+  }
+
+  const debut = Date.now();
+  let type: "invite" | "recovery" = "invite";
+  try {
+    let { data, error } = await service.auth.admin.generateLink({ type: "invite", email });
+    if (error && (error.code === "email_exists" || (!error.code && error.status === 422))) {
+      // Lien déjà ouvert (« Continuer ») sans mot de passe choisi : le compte
+      // Auth est confirmé, mais la base vient de dire que le membre est
+      // encore invité. Un lien `recovery` mène au même choix du mot de
+      // passe (version invitation : `mon_invitation()` non nul).
+      type = "recovery";
+      ({ data, error } = await service.auth.admin.generateLink({ type: "recovery", email }));
+    }
+    if (error) {
+      signaler(
+        `[renvoyerInvitation] erreur Auth : id=${id} type=${type} code=${error.code ?? "inconnu"} statut=${error.status ?? "aucun"}`,
+      );
+      return refus("ERREUR_INATTENDUE");
+    }
+    const autreId = data?.user?.id;
+    if (autreId !== id) {
+      // Jamais de lien vers un autre compte. Compte créé par CET appel
+      // (invitation annulée entre-temps) : supprimé, sinon il bloquerait
+      // l'adresse. Jamais un compte que cet appel n'a pas créé.
+      const cree =
+        typeof autreId === "string" && autreId !== "" && creeParCetAppel(data?.user?.created_at, debut);
+      if (cree) await supprimerCompteAuth(service, autreId);
+      signaler(
+        `[renvoyerInvitation] generateLink a renvoyé un autre compte que celui attendu : id=${id} autre=${autreId ?? "aucun"} supprime=${cree}`,
+      );
+      return refus("ERREUR_INATTENDUE");
+    }
+    const jeton = data?.properties?.hashed_token;
+    if (typeof jeton !== "string" || jeton === "") {
+      signaler(`[renvoyerInvitation] réponse inattendue de generateLink : id=${id} aucun jeton`);
+      return refus("ERREUR_INATTENDUE");
+    }
+    const lien = type === "invite" ? lienInvitation(site, jeton) : lienMotDePasse(site, jeton);
+    return { ok: true, donnees: { nom, lien } };
+  } catch {
+    signaler(`[renvoyerInvitation] exception pendant generateLink : id=${id}`);
+    return refus("ERREUR_INATTENDUE");
+  }
+}
+
+/**
+ * Annule l'invitation d'un membre invité (story 4.4, AD-17) : profil
+ * administrateur revérifié (sinon ACCES_REFUSE) → `annuler_invitation` avec
+ * la SESSION de l'administrateur (ligne verrouillée, état `invite`
+ * obligatoire sinon ETAT_COMPTE_INVALIDE ; ligne `membres` supprimée ;
+ * journal `invitation_annulee`) → PUIS suppression du compte Auth. Un échec
+ * de cette suppression est signalé à Sentry sans faire échouer l'action :
+ * la base ne connaît plus le membre.
+ */
+export async function annulerInvitation(membreId: unknown): Promise<ResultatAction<null>> {
+  const admin = await verifierAdmin();
+  if (!admin.ok) return refus(admin.code);
+
+  const identifiant = schemaIdCompte.safeParse(membreId);
+  if (!identifiant.success) return refus("DONNEES_INVALIDES");
+  const id = identifiant.data;
+
+  const client = await clientSession("annulerInvitation");
+  if (!client) return refus("ERREUR_INATTENDUE");
+
+  const resultat = await appeler<unknown>(client, "annuler_invitation", { p_id: id });
+  if (!resultat.ok) return refusBase(sansMembre(resultat.code));
+
+  // Seulement après la suppression de la ligne `membres` par la base.
+  const message = (detail: string) =>
+    `[annulerInvitation] compte Auth non supprimé après l'annulation : id=${id} ${detail} ; verifier_email_libre refusera l'adresse tant qu'il existe`;
+  try {
+    const service = creerClientService();
+    const { error } = await service.auth.admin.deleteUser(id);
+    if (error && error.status !== 404) {
+      signaler(message(`code=${error.code ?? "inconnu"} statut=${error.status ?? "aucun"}`));
+    }
+  } catch {
+    signaler(message("code=exception"));
+  }
+
+  revalidatePath(CHEMIN_COMPTES);
+  return { ok: true, donnees: null };
 }

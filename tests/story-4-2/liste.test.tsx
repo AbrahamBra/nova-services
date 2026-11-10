@@ -32,12 +32,19 @@ function compte(etat: Compte["etat"], demandesEnCours = 0): Compte {
 function boutons(element: React.ReactElement): string[] {
   const html = renderToStaticMarkup(<FournisseurToasts>{element}</FournisseurToasts>);
   // Texte visible de chaque bouton (sans le nom caché aux yeux).
-  return [...html.matchAll(/<button[^>]*>([^<]*)/g)].map(([, texte]) => texte.trim());
+  return [...html.matchAll(/<button[^>]*>([^<]*)/g)].map(([, texte]) =>
+    texte.replaceAll("&#x27;", "'").trim(),
+  );
 }
 
 describe("ActionsCompte — selon l'état", () => {
-  it("Invité : Modifier", () => {
-    expect(boutons(<ActionsCompte compte={compte("invite")} estMoi={false} />)).toEqual(["Modifier"]);
+  // Story 4.4 : « Renvoyer l'invitation » et « Annuler l'invitation » sur un compte invité.
+  it("Invité : Modifier, Renvoyer l'invitation, Annuler l'invitation", () => {
+    expect(boutons(<ActionsCompte compte={compte("invite")} estMoi={false} />)).toEqual([
+      "Modifier",
+      "Renvoyer l'invitation",
+      "Annuler l'invitation",
+    ]);
   });
 
   // Story 4.3 : « Générer un lien de mot de passe » sur un compte actif.
