@@ -9,6 +9,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { CLASSE_MENTION, MentionConservation } from "@/components/mention-conservation";
 import { Bouton } from "@/components/nova/bouton";
 import { BoutonReessayer } from "@/components/nova/reessayer";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -385,19 +386,8 @@ export function FormulaireDepot({ categories, emailContact, dureeConservation, c
         </div>
       </fieldset>
 
-      <p
-        id={idChamp("mention")}
-        className="mb-4 rounded-lg border border-border bg-surface px-3 py-2.5 text-[13px] leading-[1.45] text-muted-foreground"
-      >
-        Vos informations servent uniquement à traiter votre demande. Elles sont conservées{" "}
-        {dureeConservation} après son traitement, puis supprimées. Pour les faire effacer, écrivez à{" "}
-        <a
-          href={`mailto:${emailContact}`}
-          className="break-all text-primary underline underline-offset-2"
-        >
-          {emailContact}
-        </a>
-        .
+      <p id={idChamp("mention")} className={`mb-4 ${CLASSE_MENTION}`}>
+        <MentionConservation dureeConservation={dureeConservation} emailContact={emailContact} />
       </p>
 
       <div>

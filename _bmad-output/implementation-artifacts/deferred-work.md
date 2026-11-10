@@ -12,7 +12,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-2-afficher-le-formulaire-de-depot.md` (TRAITÉ en story 1.3)
   summary: Compteur de description : signaler le dépassement de 5 000 caractères et compter les caractères comme le serveur (emojis).
   evidence: Le compteur compte des unités UTF-16 et n'alerte pas au-delà de la limite ; à aligner avec la validation Zod de la story 1.3.
-- source_spec: `_bmad-output/implementation-artifacts/spec-1-2-afficher-le-formulaire-de-depot.md`
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-2-afficher-le-formulaire-de-depot.md` (TRAITÉ en story 5.3)
   summary: Mettre à jour `parametres.mis_a_jour_le` à chaque modification.
   evidence: La colonne n'a qu'une valeur par défaut ; à gérer dans `modifier_parametres` (story 5.3).
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-envoyer-ma-demande.md`
@@ -134,3 +134,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-4-4-renvoyer-annuler-invitation.md`
   summary: Les toasts d'erreur et les états « en cours » de « Renvoyer l'invitation » et « Annuler l'invitation » ne sont vérifiés par aucun test d'écran.
   evidence: même convention que les autres actions de comptes (Désactiver, Lien de mot de passe) ; à couvrir ensemble par une étape de test navigateur qui provoque un refus.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-3-parametres-generaux.md`
+  summary: Deux administrateurs qui enregistrent les paramètres l'un après l'autre depuis une page ouverte en même temps : le second écrase le premier sans avertissement.
+  evidence: non vérifié en usage réel (medium s'il arrive) ; `modifier_parametres` ne reçoit pas la version lue (`mis_a_jour_le`) ; corriger par une version attendue et un code de conflit.
+- source_spec: `_bmad-output/implementation-artifacts/spec-5-3-parametres-generaux.md`
+  summary: Le test `parametres.reel.spec.ts` modifie quelques secondes la ligne partagée `parametres` de nova-dev ; deux exécutions qui se chevauchent pourraient se gêner.
+  evidence: non observé ; à surveiller si un test du formulaire public échoue de façon isolée ; protection possible par un verrou consultatif pendant le test.

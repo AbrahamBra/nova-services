@@ -132,14 +132,15 @@ test.describe("story 5.2 — catégories", () => {
     const admin = await compte({ role: "administrateur", prenom: "Claire" });
     const nom = `${PREFIXE} Formation`;
 
-    // Entrée « Catégories » entre « Comptes » et « Journal ».
+    // Entrée « Catégories » après « Comptes », avant « Journal » (story 5.3 :
+    // « Paramètres » entre les deux).
     await seConnecter(page, admin, "/equipe/admin/comptes");
     await expect(page.getByRole("heading", { level: 1, name: "Comptes" })).toBeVisible(NAVIGATION);
     if (await boutonMenu(page).isVisible()) await boutonMenu(page).click();
     const administration = menu(page).getByRole("link");
     const libelles = await administration.allTextContents();
     expect(libelles.indexOf("Catégories")).toBe(libelles.indexOf("Comptes") + 1);
-    expect(libelles.indexOf("Journal")).toBe(libelles.indexOf("Catégories") + 1);
+    expect(libelles.indexOf("Journal")).toBeGreaterThan(libelles.indexOf("Catégories"));
     await menu(page).getByRole("link", { name: "Catégories" }).click();
     await expect(page).toHaveURL(new RegExp(`${CHEMIN}$`), NAVIGATION);
     await expect(page.getByRole("heading", { level: 1, name: "Catégories" })).toBeVisible(NAVIGATION);

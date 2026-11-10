@@ -58,6 +58,8 @@ import { Client } from "pg";
 // desactiver_categorie et activer_categorie pour authenticated (les fonctions
 // vérifient l'administrateur actif) ; prive.verifier_nom_categorie sans aucun
 // droit ; rien pour anon.
+// Story 5.3 : lire_parametres_admin et modifier_parametres pour authenticated
+// (les fonctions vérifient l'administrateur actif) ; rien pour anon.
 const COLONNES_DEMANDES = [
   "id", "reference", "canal", "nom", "email", "telephone", "societe", "objet", "description",
   "categorie_id", "statut", "priorite", "responsable_id", "saisie_par_id",
@@ -77,6 +79,8 @@ const DROITS_ATTENDUS: string[] = [
   "authenticated:fonction:public.desactiver_categorie(p_id uuid):EXECUTE",
   "authenticated:fonction:public.lister_categories_admin():EXECUTE",
   "authenticated:fonction:public.renommer_categorie(p_id uuid, p_nom text):EXECUTE",
+  "authenticated:fonction:public.lire_parametres_admin():EXECUTE",
+  "authenticated:fonction:public.modifier_parametres(p_nom_affiche text, p_email_contact text, p_duree_mois integer):EXECUTE",
   "authenticated:fonction:public.ajouter_note(p_demande_id uuid, p_texte text):EXECUTE",
   "authenticated:fonction:public.annuler_invitation(p_id uuid):EXECUTE",
   "authenticated:fonction:public.attribuer(p_demande_id uuid, p_membre_id uuid):EXECUTE",

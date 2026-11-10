@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { TYPES_JOURNAL } from "@/lib/domaine";
 import { TAILLE_PAGE_JOURNAL } from "@/lib/filtres";
-import { CLES_DETAILS_JOURNAL, TYPE_EVENEMENT_JOURNAL } from "@/lib/journal";
+import { CLES_DETAILS_JOURNAL, TYPE_EVENEMENT_JOURNAL, clesJournalValides } from "@/lib/journal";
 import {
   clientPubliableTest,
   clientServiceTest,
@@ -357,9 +357,12 @@ describe("AD-14 : aucune donnée de demandeur, clés en liste fermée", () => {
       expect(type, `ligne ${id} : ${String(evenement)} écrit avec le type « ${type} »`).toBe(
         TYPE_EVENEMENT_JOURNAL[evenement as string],
       );
-      expect(Object.keys(details).sort(), `ligne ${id} : clés de ${String(evenement)}`).toEqual(
-        [...CLES_DETAILS_JOURNAL[evenement as string]].sort(),
-      );
+      // Exactement ses clés ; story 5.3 : clés permises (champs changés
+      // seulement) pour « parametres_modifies ».
+      expect(
+        clesJournalValides(evenement as string, Object.keys(details)),
+        `ligne ${id} : clés de ${String(evenement)} : ${Object.keys(details).sort().join(", ")}`,
+      ).toBe(true);
     }
 
     // Aucune ligne ne cite le demandeur de test (insensible à la casse).
