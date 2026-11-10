@@ -63,6 +63,13 @@ export const MESSAGES_ERREUR = {
   // d'un lien (propre à l'application). L'écran propose « Demander un
   // nouveau lien ».
   LIEN_REINITIALISATION_INVALIDE: "Ce lien n'est plus valable.",
+  // Story 5.2 — gérer les catégories (ajouter_categorie, renommer_categorie,
+  // desactiver_categorie, activer_categorie). NOM_CATEGORIE_PRIS porte en
+  // détail si la catégorie existante est désactivée : l'écran affiche alors
+  // MESSAGES_CATEGORIE.nomDesactive (lib/schemas/categorie.ts).
+  NOM_CATEGORIE_PRIS: "Ce nom est déjà pris.",
+  DERNIERE_CATEGORIE: "Il doit rester au moins une catégorie active.",
+  ETAT_CATEGORIE_INVALIDE: "Cette action n'est pas possible pour l'état actuel de cette catégorie.",
 } as const;
 
 export type CodeErreur = keyof typeof MESSAGES_ERREUR;

@@ -125,8 +125,9 @@ describe("descriptionJournal", () => {
   });
 
   it("code inconnu : « Événement « code » », jamais de JSON brut", () => {
-    expect(descriptionJournal({ evenement: "categorie_ajoutee", categorie_id: "x" })).toBe(
-      "Événement « categorie_ajoutee »",
+    // Story 5.2 : « categorie_ajoutee » est devenu connu ; un code jamais écrit.
+    expect(descriptionJournal({ evenement: "evenement_futur", categorie_id: "x" })).toBe(
+      "Événement « evenement_futur »",
     );
     const sans = descriptionJournal({ autre: { a: 1 } });
     expect(sans).toBe("Événement « inconnu »");
