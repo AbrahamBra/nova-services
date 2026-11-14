@@ -1,5 +1,7 @@
 # Workflow N8N — Traitement des nouvelles demandes
 
+> **Suite :** l'agent IA conversationnel qui s'appuie sur ce workflow est dans [`agent/`](agent/README.md).
+
 Ce workflow traite automatiquement une nouvelle demande envoyée à Nova Services :
 
 ```
