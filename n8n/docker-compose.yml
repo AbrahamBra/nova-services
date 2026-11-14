@@ -1,0 +1,36 @@
+# N8N en local pour le workflow « Traitement des nouvelles demandes ».
+# Lancement : docker compose -f n8n/docker-compose.yml up -d
+# Puis ouvrir http://localhost:5678
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      # Accessible seulement depuis ce PC.
+      - "127.0.0.1:5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Europe/Paris
+      - TZ=Europe/Paris
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      # Garde la trace de toutes les exécutions (réussies et en erreur)...
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+      # ... mais pas plus de 14 jours : elles contiennent des données personnelles.
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=336
+      # Sécurité : moins de portes d'entrée et moins de pouvoirs pour les nœuds.
+      - N8N_PUBLIC_API_DISABLED=true
+      - N8N_COMMUNITY_PACKAGES_ENABLED=false
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_RESTRICT_FILE_ACCESS_TO=/home/node/.n8n-files
+      - 'NODES_EXCLUDE=["n8n-nodes-base.executeCommand","n8n-nodes-base.ssh","n8n-nodes-base.readWriteFile","n8n-nodes-base.localFileTrigger"]'
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Le dossier n8n/ du projet, en lecture seule, pour importer le workflow.
+      - ./:/projet:ro
+
+volumes:
+  n8n_data:
