@@ -197,6 +197,54 @@ noeuds.push(
   }),
 );
 
+// Aiguillage selon la fiche (vidéo 3 du cours : « Router et déclencher des actions selon la classification »).
+// Une même fiche peut suivre plusieurs branches (ex. urgente ET sans réponse).
+const regle = (cle, gauche, valeur) => ({
+  conditions: {
+    options: { caseSensitive: true, leftValue: "", typeValidation: "strict", version: 2 },
+    conditions: [{ id: `cond-${cle}`, leftValue: gauche, rightValue: valeur, operator: { type: "string", operation: "equals" } }],
+    combinator: "and",
+  },
+  renameOutput: true,
+  outputKey: cle,
+});
+const regleOu = (cle, gauche, valeurs) => ({
+  conditions: {
+    options: { caseSensitive: true, leftValue: "", typeValidation: "strict", version: 2 },
+    conditions: valeurs.map((v, i) => ({ id: `cond-${cle}-${i}`, leftValue: gauche, rightValue: v, operator: { type: "string", operation: "equals" } })),
+    combinator: "or",
+  },
+  renameOutput: true,
+  outputKey: cle,
+});
+
+const resumeEchange =
+  "Client : {{ $('Chat client').item.json.chatInput }}\nNova : {{ $('Agent Nova').item.json.output }}\nRaison : {{ $json.output.raison }}\nCatégorie : {{ $json.output.categorie }} | Exécution n° {{ $execution.id }}";
+const alerteTelegram = (id, nom, position, titre) =>
+  noeud(id, nom, "n8n-nodes-base.telegram", 1.2, position, {
+    resource: "message",
+    operation: "sendMessage",
+    chatId: "",
+    text: `=${titre}\n\n${resumeEchange}`,
+    additionalFields: { appendAttribution: false },
+  });
+
+noeuds.push(
+  noeud("a1000000-0000-4000-8000-000000000012", "Router selon la fiche", "n8n-nodes-base.switch", 3.2, [1060, -440], {
+    rules: {
+      values: [
+        regle("urgent", "={{ $json.output.priorite }}", "elevee"),
+        regle("sans_reponse", "={{ $json.output.type_reponse }}", "absence"),
+        regleOu("a_surveiller", "={{ $json.output.type_reponse }}", ["hors_perimetre", "refus_manipulation"]),
+      ],
+    },
+    options: { allMatchingOutputs: true },
+  }),
+  alerteTelegram("a1000000-0000-4000-8000-000000000013", "Alerte demande urgente", [1340, -600], "🚨 Demande URGENTE à traiter en priorité"),
+  alerteTelegram("a1000000-0000-4000-8000-000000000014", "Question sans réponse", [1340, -440], "📚 Question sans réponse dans la base de connaissances (à compléter ?)"),
+  alerteTelegram("a1000000-0000-4000-8000-000000000015", "Hors sujet ou manipulation", [1340, -280], "🛡️ Demande hors périmètre ou tentative de manipulation (pour surveillance)"),
+);
+
 const versAgent = (type) => ({ [type]: [[{ node: "Agent Nova", type, index: 0 }]] });
 
 const workflow = {
@@ -205,7 +253,8 @@ const workflow = {
   connections: {
     "Chat client": { main: [[{ node: "Agent Nova", type: "main", index: 0 }]] },
     "Agent Nova": { main: [[{ node: "Fiche de suivi (IA)", type: "main", index: 0 }]] },
-    "Fiche de suivi (IA)": { main: [[{ node: "Journal agent (Sheets)", type: "main", index: 0 }]] },
+    "Fiche de suivi (IA)": { main: [[{ node: "Journal agent (Sheets)", type: "main", index: 0 }, { node: "Router selon la fiche", type: "main", index: 0 }]] },
+    "Router selon la fiche": { main: [[{ node: "Alerte demande urgente", type: "main", index: 0 }], [{ node: "Question sans réponse", type: "main", index: 0 }], [{ node: "Hors sujet ou manipulation", type: "main", index: 0 }]] },
     "Modèle Claude (fiche)": { ai_languageModel: [[{ node: "Fiche de suivi (IA)", type: "ai_languageModel", index: 0 }]] },
     "Format de la fiche": { ai_outputParser: [[{ node: "Fiche de suivi (IA)", type: "ai_outputParser", index: 0 }]] },
     "Modèle Claude": versAgent("ai_languageModel"),

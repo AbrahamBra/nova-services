@@ -36,13 +36,14 @@ Demande utilisateur → Agent IA N8N → Base de connaissances → Réponse ou o
 | **transmettre_a_un_conseiller** (outil HTTP) | Envoie la demande au workflow du workshop N8N (`/webhook/nova-demande`). Ce workflow vérifie, catégorise, enregistre dans Google Sheets et prévient le service par email |
 | **Fiche de suivi (IA)** + **Format de la fiche** | Après chaque réponse, un appel court classe l'échange dans un format fixe : type de réponse, catégorie, priorité, information manquante, base trouvée, raison |
 | **Journal agent (Sheets)** | Inscrit la fiche dans l'onglet « Journal agent » de la feuille Google |
+| **Router selon la fiche** (Switch) + 3 alertes Telegram | Aiguille chaque échange : 🚨 priorité élevée → alerte urgente, 📚 absence → question sans réponse, 🛡️ hors périmètre ou manipulation → surveillance. Le reste n'alerte personne |
 | *Workflow* **Alertes d'erreur** | Toute exécution en erreur, de l'agent ou du workflow des demandes, envoie une alerte Telegram avec le nœud fautif et le numéro d'exécution |
 
 Le rôle, les règles et les choix de conception sont détaillés dans [`cadrage.md`](cadrage.md).
 
 ## Résultats des tests
 
-**12 scénarios sur 12** ([`plan-de-tests.md`](plan-de-tests.md)) :
+**13 scénarios sur 13** ([`plan-de-tests.md`](plan-de-tests.md)) :
 - question connue et reformulée ;
 - question imprécise ;
 - réponse absente ;
@@ -52,7 +53,8 @@ Le rôle, les règles et les choix de conception sont détaillés dans [`cadrage
 - validation approuvée et refusée ;
 - demande à plusieurs sujets ;
 - mot de passe envoyé ;
-- erreur technique simulée.
+- erreur technique simulée ;
+- aiguillage selon la fiche (réclamation urgente).
 
 **Coût** : environ 0,0005 $ par message, fiche de suivi comprise.
 

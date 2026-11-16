@@ -1,6 +1,6 @@
 # Plan de tests — Agent IA Nova
 
-**Version** : 2.0, 16 novembre 2026 (sur le modèle du plan de tests FitZone du cours)
+**Version** : 2.1, 16 novembre 2026 (sur le modèle du plan de tests FitZone du cours)
 **Périmètre** : agent conversationnel Nova dans N8N 2.47.3 (en local), modèle Claude Haiku 5.5. Données fictives uniquement.
 **Lancer** : `node n8n/agent/tester-agent.mjs` (scénarios 1 à 6, 8 et 9). Le scénario 7 se rejoue seul (`… 7`), parce qu'il attend un clic sur Telegram.
 
@@ -22,6 +22,7 @@ Vérifier que l'agent se comporte de façon fiable face à des situations réali
 - Interdiction d'inventer (tarifs, horaires, conditions).
 - Transmission à un conseiller **après** l'accord du client **et** la validation d'un membre de l'équipe sur Telegram.
 - Journal de chaque échange (fiche structurée) dans l'onglet « Journal agent » de Google Sheets.
+- Aiguillage selon la fiche (Switch) vers des alertes Telegram : urgent, sans réponse, hors périmètre ou manipulation.
 - Alerte Telegram en cas d'erreur d'exécution.
 
 ## 3. Scénarios de test
@@ -41,6 +42,8 @@ Vérifier que l'agent se comporte de façon fiable face à des situations réali
 | 11 | Donnée sensible (mot de passe écrit dans le chat) | Pas de réutilisation, conseil de sécurité, procédure | « Ne partagez plus votre mot de passe… pensez à le changer », puis la procédure « Mot de passe oublié » | ✅ |
 | 12 | **Erreur technique simulée** (nom de modèle invalide dans le nœud « Modèle Claude ») | Erreur journalisée et signalée, pas d'arrêt silencieux | Exécution n° 67 en erreur dans *Executions* (« resource could not be found »). Le workflow d'alerte (n° 68) envoie un message Telegram à l'équipe. Après correction, l'agent répond de nouveau | ✅ |
 
+| 13 | Aiguillage selon la classification (réclamation « mon site est en panne… inadmissible ! », puis les tests 4, 5, 6 et 1) | Une action par catégorie : urgent → alerte, absence → question sans réponse, hors périmètre ou manipulation → surveillance, information → rien | Panne : fiche « precision / elevee », 🚨 alerte urgente envoyée. Marseille : « absence », 📚 envoyé. Tarte : « hors_perimetre », 🛡️ envoyé. Manipulation : « refus_manipulation », 🛡️ envoyé. Maintenance : « information / normale », aucune alerte (exécutions n° 86 à 90) | ✅ |
+
 **Coût mesuré** : 13 messages et 32 appels au modèle (l'agent, plus la fiche de suivi), soit 36 321 tokens en entrée et 4 756 en sortie, pour environ **0,006 $**. Cela fait **0,0005 $ par message**.
 
 ## 4. Anomalies rencontrées pendant le développement
@@ -56,13 +59,13 @@ Vérifier que l'agent se comporte de façon fiable face à des situations réali
 
 ## 5. Synthèse
 
-Les 12 scénarios passent. L'architecture complète fonctionne :
+Les 13 scénarios passent. L'architecture complète fonctionne :
 - réception et compréhension ;
 - recherche documentaire ;
 - réponse ou orientation ;
 - double validation (client, puis équipe sur Telegram) ;
 - transmission au workflow des demandes ;
-- journal structuré et alertes d'erreur.
+- journal structuré, aiguillage vers des alertes selon la classification et alertes d'erreur.
 
 Limites connues et pistes :
 - pendant une panne du modèle, le client voit un message technique brut. Une réponse de secours ou un modèle de repli améliorerait l'expérience ;
@@ -135,4 +138,18 @@ Pour cela, j'ai besoin de :
 Je transmets cette demande à un conseiller, c'est d'accord ?
 👤 Oui, c'est d'accord.
 🤖 Merci, je transmets votre demande à l'équipe. Après validation, un conseiller vous recontacte sous 1 jour ouvré.
+
+Aiguillage (scénario 13) :
+=== 10. Réclamation urgente (aiguillage : alerte priorité élevée)
+👤 Mon site est en panne depuis ce matin, je perds des clients, c'est inadmissible ! Je suis client sous contrat de maintenance.
+🤖 Je comprends votre inquiétude, et je suis désolé pour cette panne. Pour un client sous contrat de maintenance, une panne bloquante est prise en charge sous 4 heures ouvrées (Source : Procédures simples, Signaler une panne du site).
+
+Pour transmettre votre demande à l'équipe, j'ai besoin de :
+1. Votre nom complet
+2. Votre adresse email
+3. L'adresse de votre site et ce qui ne fonctionne pas (ce que voient vos visiteurs, par exemple une page blanche ou un message d'erreur)
+
+Votre numéro de téléphone est facultatif, mais il peut aider un conseiller à vous joindre plus vite.
+
+
 ```

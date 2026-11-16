@@ -346,6 +346,163 @@
         },
         "options": {}
       }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000012",
+      "name": "Router selon la fiche",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1060,
+        -440
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-urgent",
+                    "leftValue": "={{ $json.output.priorite }}",
+                    "rightValue": "elevee",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "urgent"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-sans_reponse",
+                    "leftValue": "={{ $json.output.type_reponse }}",
+                    "rightValue": "absence",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sans_reponse"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-a_surveiller-0",
+                    "leftValue": "={{ $json.output.type_reponse }}",
+                    "rightValue": "hors_perimetre",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "cond-a_surveiller-1",
+                    "leftValue": "={{ $json.output.type_reponse }}",
+                    "rightValue": "refus_manipulation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "a_surveiller"
+            }
+          ]
+        },
+        "options": {
+          "allMatchingOutputs": true
+        }
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000013",
+      "name": "Alerte demande urgente",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        -600
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "",
+        "text": "=🚨 Demande URGENTE à traiter en priorité\n\nClient : {{ $('Chat client').item.json.chatInput }}\nNova : {{ $('Agent Nova').item.json.output }}\nRaison : {{ $json.output.raison }}\nCatégorie : {{ $json.output.categorie }} | Exécution n° {{ $execution.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000014",
+      "name": "Question sans réponse",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        -440
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "",
+        "text": "=📚 Question sans réponse dans la base de connaissances (à compléter ?)\n\nClient : {{ $('Chat client').item.json.chatInput }}\nNova : {{ $('Agent Nova').item.json.output }}\nRaison : {{ $json.output.raison }}\nCatégorie : {{ $json.output.categorie }} | Exécution n° {{ $execution.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000015",
+      "name": "Hors sujet ou manipulation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        -280
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "",
+        "text": "=🛡️ Demande hors périmètre ou tentative de manipulation (pour surveillance)\n\nClient : {{ $('Chat client').item.json.chatInput }}\nNova : {{ $('Agent Nova').item.json.output }}\nRaison : {{ $json.output.raison }}\nCatégorie : {{ $json.output.categorie }} | Exécution n° {{ $execution.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
     }
   ],
   "connections": {
@@ -376,6 +533,36 @@
         [
           {
             "node": "Journal agent (Sheets)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Router selon la fiche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router selon la fiche": {
+      "main": [
+        [
+          {
+            "node": "Alerte demande urgente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Question sans réponse",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hors sujet ou manipulation",
             "type": "main",
             "index": 0
           }

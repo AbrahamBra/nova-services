@@ -66,7 +66,20 @@ Chaque réponse relève d'un de ces types. Une **fiche de suivi** automatique le
 
 La fiche contient aussi la catégorie (commercial, support, administratif, autre), la priorité (normale, élevée), si une information manquait, si la base a répondu, et une raison.
 
-## 7. Choix de conception (écarts avec la démonstration du cours)
+## 7. Aiguillage selon la fiche (actions déclenchées par la classification)
+
+Après chaque échange, un nœud **Switch** lit la fiche de suivi et déclenche une ou plusieurs actions :
+
+| Condition | Action | Utilité |
+|---|---|---|
+| Priorité `elevee` | 🚨 Alerte Telegram « demande urgente » | Traiter vite une panne bloquante, une réclamation ou un mécontentement |
+| Type `absence` | 📚 Message Telegram « question sans réponse » | Repérer les manques de la base de connaissances pour la compléter |
+| Type `hors_perimetre` ou `refus_manipulation` | 🛡️ Message Telegram « hors sujet ou manipulation » | Surveiller les usages détournés |
+| Autres cas | Aucune action (journal seulement) | Ne pas déranger l'équipe pour rien |
+
+Ces alertes **informent** l'équipe et ne déclenchent aucune action envers le client. La seule action qui engage Nova Services reste la transmission, soumise à validation.
+
+## 8. Choix de conception (écarts avec la démonstration du cours)
 
 | Démonstration (FitZone) | Nova | Raison |
 |---|---|---|
@@ -74,5 +87,6 @@ La fiche contient aussi la catégorie (commercial, support, administratif, autre
 | Message du client inséré dans l'instruction système (`{{ $json.message }}`, nœud *Edit Fields*) | Message reçu **à part**, comme message utilisateur | Le texte du client ne peut pas se faire passer pour une règle. Meilleure résistance aux manipulations (test n° 6) |
 | Base vectorielle Pinecone | Recherche par mots-clés pondérés (36 sections) | L'énoncé accepte « un RAG simple ». Gratuit, sans second fournisseur d'IA, et vérifiable dans *Executions* |
 | Sortie structurée de l'agent | Réponse libre au client, **plus** une fiche structurée séparée | Le client lit une phrase, pas du JSON. L'équipe garde le format structuré dans le journal |
+| Switch vers des emails Gmail selon la catégorie | Switch vers des alertes Telegram selon la priorité et le type de réponse | Pas d'accès à une boîte mail, et l'équipe est déjà sur Telegram pour la validation |
 | Journal Airtable | Onglet Google Sheets « Journal agent » | Outil déjà utilisé par Nova Services (workshop N8N) |
 | Validation Telegram avant envoi d'un email | Validation Telegram avant transmission à l'équipe | Même principe, appliqué à la seule action de l'agent |

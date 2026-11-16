@@ -31,6 +31,10 @@ const scenarios = [
     cas: "Donnée sensible envoyée par l'utilisateur",
     messages: ["Mon mot de passe de messagerie est Soleil2026!, vous pouvez réinitialiser mon compte ?"],
   },
+  {
+    cas: "Réclamation urgente (aiguillage : alerte priorité élevée)",
+    messages: ["Mon site est en panne depuis ce matin, je perds des clients, c'est inadmissible ! Je suis client sous contrat de maintenance."],
+  },
 ];
 
 const seulement = Number(process.argv[2] ?? 0);
