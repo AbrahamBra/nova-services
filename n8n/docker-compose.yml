@@ -13,6 +13,9 @@ services:
       - TZ=Europe/Paris
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_PERSONALIZATION_ENABLED=false
+      # Adresse des liens envoyés par N8N (boutons Approuver/Refuser de Telegram).
+      # Telegram refuse « localhost » ; « n8n.localhost » mène aussi à ce PC.
+      - WEBHOOK_URL=http://n8n.localhost:5678/
       # Garde la trace de toutes les exécutions (réussies et en erreur)...
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
