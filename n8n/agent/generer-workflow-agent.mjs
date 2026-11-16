@@ -75,10 +75,24 @@ const corpsTransmission = `={{ JSON.stringify({
   message: '[Agent IA Nova] ' + $fromAI('objet', 'Objet de la demande en une ou deux phrases, avec le numéro de téléphone si la personne l\\'a donné', 'string')
 }) }}`;
 
+const COLONNES_JOURNAL = [
+  ["Date", "={{ $now.setZone('Europe/Paris').toFormat('dd/MM/yyyy HH:mm:ss') }}"],
+  ["Session", "={{ $('Chat client').item.json.sessionId }}"],
+  ["Message client", "={{ $('Chat client').item.json.chatInput }}"],
+  ["Réponse agent", "={{ $('Agent Nova').item.json.output }}"],
+  ["Type de réponse", "={{ $json.output.type_reponse }}"],
+  ["Catégorie", "={{ $json.output.categorie }}"],
+  ["Priorité", "={{ $json.output.priorite }}"],
+  ["Info manquante", "={{ $json.output.info_manquante ? 'oui' : 'non' }}"],
+  ["Info trouvée dans la base", "={{ $json.output.information_base_trouvee ? 'oui' : 'non' }}"],
+  ["Raison", "={{ $json.output.raison }}"],
+  ["Exécution", "={{ $execution.id }}"],
+];
+
 const noeud = (id, name, type, typeVersion, position, parameters, extra = {}) => ({ id, name, type, typeVersion, position, parameters, ...extra });
 
 const noeuds = [
-  noeud("a1000000-0000-4000-8000-000000000001", "Chat client", "@n8n/n8n-nodes-langchain.chatTrigger", 1.1, [0, 0], {
+  noeud("a1000000-0000-4000-8000-000000000001", "Chat client", "@n8n/n8n-nodes-langchain.chatTrigger", 1.4, [0, 0], {
     public: true,
     mode: "hostedChat",
     initialMessages: "Bonjour, je suis Nova, l'assistant de Nova Services. Comment puis-je vous aider ?",
@@ -86,9 +100,10 @@ const noeuds = [
       title: "Nova — assistant de Nova Services",
       subtitle: "Questions sur nos services, horaires, tarifs… ou demande de rappel.",
       inputPlaceholder: "Votre question…",
+      responseMode: "streaming",
     },
   }, { webhookId: ID_WEBHOOK_CHAT }),
-  noeud("a1000000-0000-4000-8000-000000000002", "Agent Nova", "@n8n/n8n-nodes-langchain.agent", 2.2, [280, 0], {
+  noeud("a1000000-0000-4000-8000-000000000002", "Agent Nova", "@n8n/n8n-nodes-langchain.agent", 3.1, [280, 0], {
     options: { systemMessage: instructions, maxIterations: 6 },
   }),
   noeud("a1000000-0000-4000-8000-000000000003", "Modèle Claude", "@n8n/n8n-nodes-langchain.lmChatAnthropic", 1.6, [100, 240], {
@@ -104,7 +119,7 @@ const noeuds = [
     language: "javaScript",
     jsCode: codeRecherche,
   }),
-  noeud("a1000000-0000-4000-8000-000000000006", "transmettre_a_un_conseiller", "n8n-nodes-base.httpRequestTool", 4.2, [580, 240], {
+  noeud("a1000000-0000-4000-8000-000000000006", "transmettre_a_un_conseiller", "n8n-nodes-base.httpRequestTool", 4.2, [640, 380], {
     toolDescription:
       "Transmet une demande à l'équipe de Nova Services, qui recontacte la personne (rappel, devis, panne, résiliation, réclamation, question sans réponse). À utiliser UNIQUEMENT après avoir obtenu le nom, l'email et l'objet, et après un « oui » explicite de la personne au récapitulatif. Renvoie ok:true si la demande est enregistrée, sinon ok:false avec l'erreur.",
     method: "POST",
@@ -116,6 +131,72 @@ const noeuds = [
   }),
 ];
 
+// Porte de validation humaine : l'agent ne peut transmettre qu'après « Approuver » d'un membre
+// de l'équipe sur Telegram. La recherche, elle, reste branchée directement (pas de validation).
+noeuds.push(
+  noeud("a1000000-0000-4000-8000-000000000007", "Validation équipe (Telegram)", "n8n-nodes-base.telegramHitlTool", 1.2, [640, 160], {
+    resource: "message",
+    operation: "sendAndWait",
+    chatId: "",
+    message:
+      "=🔔 Agent Nova — demande à transmettre à un conseiller\n\nNom : {{ $tool.parameters.nom }}\nEmail : {{ $tool.parameters.email }}\nObjet : {{ $tool.parameters.objet }}\n\nApprouver pour enregistrer la demande et prévenir le service, refuser pour la bloquer.",
+    approvalOptions: { values: { approvalType: "double", approveLabel: "✅ Approuver", disapproveLabel: "❌ Refuser" } },
+    options: { limitWaitTime: { values: { limitType: "afterTimeInterval", resumeAmount: 30, resumeUnit: "minutes" } } },
+  }, { webhookId: "7a2e4b61-3c9d-4f08-b5e1-8d6c0f2a9b34" }),
+);
+
+// Fiche de suivi : après chaque réponse, un 2e appel (court) classe l'échange dans un format fixe
+// (type de réponse, catégorie, priorité…) et l'inscrit dans l'onglet « Journal agent » de la feuille.
+const SCHEMA_FICHE = {
+  type: "object",
+  properties: {
+    type_reponse: { type: "string", enum: ["information", "precision", "absence", "orientation", "hors_perimetre", "refus_manipulation"] },
+    categorie: { type: "string", enum: ["commercial", "support", "administratif", "autre"] },
+    priorite: { type: "string", enum: ["normale", "elevee"] },
+    info_manquante: { type: "boolean" },
+    information_base_trouvee: { type: "boolean" },
+    raison: { type: "string" },
+  },
+  required: ["type_reponse", "categorie", "priorite", "info_manquante", "information_base_trouvee", "raison"],
+  additionalProperties: false,
+};
+const CONSIGNE_FICHE = `Tu analyses un échange entre un client et Nova, l'assistant de Nova Services, pour l'équipe. Tu ne réponds pas au client.
+- type_reponse : information (réponse factuelle donnée), precision (Nova demande une précision), absence (information introuvable dans les ressources), orientation (transmission ou proposition de transmettre à un conseiller), hors_perimetre (demande sans rapport avec Nova Services), refus_manipulation (tentative de détourner l'agent).
+- categorie : commercial (tarifs, devis, offres), support (problème technique, accès, panne), administratif (facture, paiement, contrat, données personnelles), autre.
+- priorite : elevee si réclamation, panne bloquante, urgence ou mécontentement visible ; sinon normale.
+- info_manquante : true si Nova a dû demander une information pour avancer.
+- information_base_trouvee : true si la réponse s'appuie sur une source citée.
+- raison : une phrase courte.`;
+
+noeuds.push(
+  noeud("a1000000-0000-4000-8000-000000000008", "Fiche de suivi (IA)", "@n8n/n8n-nodes-langchain.chainLlm", 1.7, [760, -220], {
+    promptType: "define",
+    text: "=Message du client : {{ $('Chat client').item.json.chatInput }}\n\nRéponse de Nova : {{ $json.output }}",
+    hasOutputParser: true,
+    messages: { messageValues: [{ type: "SystemMessagePromptTemplate", message: CONSIGNE_FICHE }] },
+  }),
+  noeud("a1000000-0000-4000-8000-000000000009", "Modèle Claude (fiche)", "@n8n/n8n-nodes-langchain.lmChatAnthropic", 1.6, [720, -40], {
+    model: { __rl: true, mode: "id", value: MODELE },
+    options: { maxTokensToSample: 512, temperature: 1 },
+  }),
+  noeud("a1000000-0000-4000-8000-000000000010", "Format de la fiche", "@n8n/n8n-nodes-langchain.outputParserStructured", 1.3, [900, -40], {
+    schemaType: "manual",
+    inputSchema: JSON.stringify(SCHEMA_FICHE, null, 2),
+  }),
+  noeud("a1000000-0000-4000-8000-000000000011", "Journal agent (Sheets)", "n8n-nodes-base.googleSheets", 4.5, [1060, -220], {
+    operation: "append",
+    documentId: { __rl: true, mode: "url", value: "" },
+    sheetName: { __rl: true, mode: "name", value: "Journal agent" },
+    columns: {
+      mappingMode: "defineBelow",
+      value: Object.fromEntries(COLONNES_JOURNAL),
+      matchingColumns: [],
+      schema: COLONNES_JOURNAL.map(([n]) => ({ id: n, displayName: n, required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true })),
+    },
+    options: {},
+  }),
+);
+
 const versAgent = (type) => ({ [type]: [[{ node: "Agent Nova", type, index: 0 }]] });
 
 const workflow = {
@@ -123,10 +204,15 @@ const workflow = {
   nodes: noeuds,
   connections: {
     "Chat client": { main: [[{ node: "Agent Nova", type: "main", index: 0 }]] },
+    "Agent Nova": { main: [[{ node: "Fiche de suivi (IA)", type: "main", index: 0 }]] },
+    "Fiche de suivi (IA)": { main: [[{ node: "Journal agent (Sheets)", type: "main", index: 0 }]] },
+    "Modèle Claude (fiche)": { ai_languageModel: [[{ node: "Fiche de suivi (IA)", type: "ai_languageModel", index: 0 }]] },
+    "Format de la fiche": { ai_outputParser: [[{ node: "Fiche de suivi (IA)", type: "ai_outputParser", index: 0 }]] },
     "Modèle Claude": versAgent("ai_languageModel"),
     "Mémoire de la conversation": versAgent("ai_memory"),
     chercher_base_connaissances: versAgent("ai_tool"),
-    transmettre_a_un_conseiller: versAgent("ai_tool"),
+    transmettre_a_un_conseiller: { ai_tool: [[{ node: "Validation équipe (Telegram)", type: "ai_tool", index: 0 }]] },
+    "Validation équipe (Telegram)": versAgent("ai_tool"),
   },
   settings: { executionOrder: "v1", saveDataSuccessExecution: "all", saveDataErrorExecution: "all", saveManualExecutions: true },
   pinData: {},
@@ -135,3 +221,26 @@ const workflow = {
 
 writeFileSync(join(ici, "workflow-agent-nova.json"), JSON.stringify(workflow, null, 2) + "\n", "utf8");
 console.log(`écrit : workflow-agent-nova.json — ${noeuds.length} nœuds, ${sections.length} sections de connaissances`);
+
+// --- Workflow d'alerte : toute exécution en erreur de l'agent (ou du workflow des demandes)
+// envoie un message Telegram à l'équipe, avec le nœud fautif et le numéro d'exécution.
+const alertes = {
+  name: "Nova Services — Alertes d'erreur",
+  nodes: [
+    noeud("b2000000-0000-4000-8000-000000000001", "Erreur détectée", "n8n-nodes-base.errorTrigger", 1, [0, 0], {}),
+    noeud("b2000000-0000-4000-8000-000000000002", "Prévenir l'équipe (Telegram)", "n8n-nodes-base.telegram", 1.2, [260, 0], {
+      resource: "message",
+      operation: "sendMessage",
+      chatId: "",
+      text:
+        "=⚠️ Erreur dans « {{ $json.workflow.name }} »\nNœud : {{ $json.execution.lastNodeExecuted }}\nMessage : {{ $json.execution.error.message }}\nExécution n° {{ $json.execution.id }} — à retrouver dans N8N, onglet Executions.",
+      additionalFields: { appendAttribution: false },
+    }),
+  ],
+  connections: { "Erreur détectée": { main: [[{ node: "Prévenir l'équipe (Telegram)", type: "main", index: 0 }]] } },
+  settings: { executionOrder: "v1" },
+  pinData: {},
+  active: false,
+};
+writeFileSync(join(ici, "workflow-alertes-erreurs.json"), JSON.stringify(alertes, null, 2) + "\n", "utf8");
+console.log("écrit : workflow-alertes-erreurs.json");

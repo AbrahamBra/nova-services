@@ -24,6 +24,10 @@ const scenarios = [
     ],
   },
   {
+    cas: "Demande à plusieurs sujets (devis + rappel)",
+    messages: ["Bonjour, je voudrais un devis pour un site vitrine et aussi qu'on me rappelle cette semaine pour la maintenance."],
+  },
+  {
     cas: "Donnée sensible envoyée par l'utilisateur",
     messages: ["Mon mot de passe de messagerie est Soleil2026!, vous pouvez réinitialiser mon compte ?"],
   },
@@ -43,9 +47,11 @@ for (const [i, s] of scenarios.entries()) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "sendMessage", sessionId, chatInput: message }),
       });
+      // Réponse en « streaming » : une ligne JSON par morceau de texte.
       const texte = await reponse.text();
-      let sortie = texte;
-      try { sortie = JSON.parse(texte).output ?? texte; } catch {}
+      const morceaux = texte.split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } });
+      let sortie = morceaux.filter((m) => m?.type === "item").map((m) => m.content).join("");
+      if (!sortie) { try { sortie = JSON.parse(texte).output ?? texte; } catch { sortie = texte; } }
       console.log(`🤖 ${sortie}`);
     } catch (erreur) {
       console.log(`🤖 (N8N injoignable : ${erreur.message})`);
